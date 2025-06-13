@@ -23,6 +23,8 @@ OutActionPlanFileName: ActionPlan
 ## EXCLUSIONS : AAD
 ##======================
 # This is for the Azure Active Directory product
+# Anchors (&) and aliases (*) reduce repetition in config files.
+# E.g., &OrgCapExclusions defines a value reused via *OrgCapExclusions.
 Aad:
   # Legacy authentication SHALL be blocked.
   MS.AAD.1.1v1: &OrgCapExclusions
@@ -89,13 +91,11 @@ Aad:
         - 9d9ac7b2-5aa6-4830-a17a-6557e52140b0 # Example User
   #Permanent active role assignments SHALL NOT be allowed for highly privileged roles.
   MS.AAD.7.4v1: &OrgRolesExclusions
-    PrivilegedRoleExclusions:
-      Roles:
-        - Global Administrator
-        - Privileged Role Administrator
-        - Exchange Administrator
-        - SharePoint Administrator
-        - Teams Administrator
+    RoleExclusions:
+      Users:
+        - 2a8adc58-b7c5-4086-a5cc-244b8df40ce8
+      Groups:
+        - 4a471183-d934-4fb4-b1b3-d9525e0e1b45
 ##======================
 ## EXCLUSIONS : DEFENDER
 ##======================
