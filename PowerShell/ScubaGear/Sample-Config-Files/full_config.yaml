@@ -43,9 +43,10 @@ OutFolderName: M365BaselineConformance
 OutProviderFileName: ProviderSettingsExport
 OutRegoFileName: TestResults
 OutReportName: BaselineReports
-##======================
-## EXCLUSIONS : AAD
-##======================
+
+# ======================
+# EXCLUSIONS : AAD
+# ======================
 # This is for the Azure Active Directory product
 Aad:
   # Legacy authentication SHALL be blocked.
@@ -89,7 +90,7 @@ Aad:
       Users:
         - 9d9ac7b2-5aa6-4830-a17a-6557e52140b0 # Example User
 
-  #Phishing-resistant MFA SHALL be required for highly privileged roles.
+  # Phishing-resistant MFA SHALL be required for highly privileged roles.
   MS.AAD.3.6v1: &OrgCapExclusions
     CapExclusions:
       Groups:
@@ -105,7 +106,7 @@ Aad:
       Users:
         - 9d9ac7b2-5aa6-4830-a17a-6557e52140b0 # Example User
 
-  #Managed Devices SHOULD be required to register MFA
+  # Managed Devices SHOULD be required to register MFA
   MS.AAD.3.8v1: &OrgCapExclusions
     CapExclusions:
       Groups:
@@ -113,7 +114,7 @@ Aad:
       Users:
         - 9d9ac7b2-5aa6-4830-a17a-6557e52140b0 # Example User
 
-  #Deviceflow block SHALL be enforced for all users.
+  # Deviceflow block SHALL be enforced for all users.
   MS.AAD.3.9v1: &OrgCapExclusions
     CapExclusions:
       Groups:
@@ -121,7 +122,7 @@ Aad:
       Users:
         - 9d9ac7b2-5aa6-4830-a17a-6557e52140b0 # Example User
 
-  #Permanent active role assignments SHALL NOT be allowed for highly privileged roles.
+  # Permanent active role assignments SHALL NOT be allowed for highly privileged roles.
   MS.AAD.7.4v1: &OrgRolesExclusions
     RoleExclusions:
       Users:
@@ -129,9 +130,9 @@ Aad:
       Groups:
         - 4a471183-d934-4fb4-b1b3-d9525e0e1b45
 
-##======================
-## EXCLUSIONS : DEFENDER
-##======================
+# ======================
+# EXCLUSIONS : DEFENDER
+# ======================
 # This is for the Defender product
 Defender:
   MS.DEFENDER.1.4v1: &CommonSensitiveAccountFilter
@@ -180,9 +181,9 @@ Defender:
     PartnerDomains:
       - random.mail.example.com
 
-##======================
-## EXCLUSIONS : EXO
-##======================
+# ======================
+# EXCLUSIONS : EXO
+# ======================
 # This is for the Exchange Online product
 Exo:
   MS.EXO.1.1v2:
