@@ -2,7 +2,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="ScubaGear Configuration Editor"
-    Height="855"
+    Height="860"
     Width="1200"
     WindowStartupLocation="CenterScreen"
     Background="#F6FBFE"
@@ -321,14 +321,8 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Vertical">
-                <TextBlock Text="ScubaGear Configuration Editor"
-                           FontSize="22"
-                           FontWeight="Bold"
-                           Foreground="{StaticResource PrimaryBrush}"/>
-                <TextBlock Text="Create a ScubaGear configuration file for exclusions and omissions"
-                           Foreground="{StaticResource MutedTextBrush}"
-                           Margin="0,4,0,0"/>
-
+                <TextBlock x:Name="TitleTextBlock" FontSize="22" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock x:Name="SubtitleTextBlock" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -390,15 +384,13 @@
 
                                     <!-- M365 Environment -->
                                     <StackPanel Margin="0,0,0,16">
-                                        <TextBlock Text="M365 Environment" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="EnvironmentTextBlock" Text="M365 Environment" FontWeight="Medium" Margin="0,0,0,4"/>
                                         <ComboBox x:Name="EnvironmentComboBox" Width="380" HorizontalAlignment="Left"/>
                                     </StackPanel>
 
                                     <!-- Products -->
                                     <StackPanel Margin="0,0,0,16">
-                                        <TextBlock Text="Products"
-                                               FontWeight="Medium"
-                                               Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="ProductsTextBlock" Text="Products" FontWeight="Medium" Margin="0,0,0,4"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                             <Button x:Name="SelectAllButton"
                                                 Style="{StaticResource SecondaryButton}"
@@ -455,9 +447,7 @@
                                         FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryBrush}"
                                         Margin="0,0,0,8"/>
-                                <TextBlock Text="Configure exclusions for specific policies. Exclusions allow you to customize policy behavior by excluding specific users, groups, domains, or other entities from policy evaluation. Products must be selected on the main page before configuring exclusions."
-                                        TextWrapping="Wrap"
-                                        Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBlock x:Name="ExclusionsTabInfoTextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                             </StackPanel>
                         </Border>
 
@@ -575,9 +565,7 @@
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource PrimaryBrush}"
                                            Margin="0,0,0,8"/>
-                                <TextBlock Text="Select policies to omit from the assessment and provide justification. Products must be selected on the main page before configuring omissions."
-                                           TextWrapping="Wrap"
-                                           Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBlock x:Name="OmissionsTabInfoTextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                             </StackPanel>
                         </Border>
 
@@ -701,11 +689,10 @@
                                                     <TextBox x:Name="AppIdTextBox" Width="300"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                <TextBlock Text="Certificate:" Width="120" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="CertificateTextBox" Width="220"/>
-                                                <Button x:Name="SelectCertificateButton" Content="Select..." Style="{StaticResource SecondaryButton}"
-                                                        Width="70" Height="24" Margin="8,0,0,0"/>
-                                            </StackPanel>
+                                                    <TextBlock Text="Certificate:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="CertificateTextBox" MinWidth="300" Width="Auto"/>
+                                                    <Button x:Name="SelectCertificateButton" Content="Select..." Style="{StaticResource SecondaryButton}" Width="70" Height="24" Margin="8,0,0,0"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
@@ -789,15 +776,25 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <!-- Preview Tab Content (Hidden by default) -->
                         <Grid x:Name="PreviewTabContent">
-                            <Border Style="{StaticResource Card}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <Border Grid.Row="0" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="YAML Preview"
-                                           FontSize="18"
-                                           FontWeight="SemiBold"
-                                           Margin="0,0,0,16"/>
-
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Margin="0,0,0,16"/>
+                                    <TextBlock x:Name="PreviewTabInfoTextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                </StackPanel>
+                            </Border>
+                            
+                            <Border Grid.Row="1" >
+                                <StackPanel Margin="0,16,0,0">
                                     <TextBox x:Name="YamlPreviewTextBox"
-                                         Height="507"
+                                         Height="Auto"
                                          FontFamily="Consolas, Courier New, monospace"
                                          FontSize="14"
                                          TextWrapping="Wrap"

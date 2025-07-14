@@ -226,6 +226,9 @@ Function Invoke-SCuBAConfigAppUI {
     Param(
         $YAMLConfig,
 
+        [ValidateSet('en-US')]
+        $Language = 'en-US',
+
         [switch]$Online,
 
         [switch]$Passthru
@@ -234,13 +237,29 @@ Function Invoke-SCuBAConfigAppUI {
     [string]${CmdletName} = $MyInvocation.MyCommand
     Write-Verbose ("{0}: Sequencer started" -f ${CmdletName})
 
+    # Connect to Microsoft Graph if Online parameter is used
+    if ($Online) {
+        try {
+            Write-Host "Connecting to Microsoft Graph..." -ForegroundColor Green
+            Connect-MgGraph -Scopes "User.Read.All", "Group.Read.All", "Policy.Read.All" -NoWelcome
+            $Online = $true
+            Write-Host "Successfully connected to Microsoft Graph" -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Failed to connect to Microsoft Graph: $($_.Exception.Message)"
+            $Online = $false
+        }
+    } else {
+        $Online = $false
+    }
+
     # build a hash table with locale data to pass to runspace
     $syncHash = [hashtable]::Synchronized(@{})
     $Runspace =[runspacefactory]::CreateRunspace()
     $syncHash.Runspace = $Runspace
-    $syncHash.Online = $Online.IsPresent
+    $syncHash.GraphConnected = $Online
     $syncHash.XamlPath = "$PSScriptRoot\ScubaConfigAppUI.xaml"
-    $syncHash.UIConfigPath = "$PSScriptRoot\ScubaConfig.json"
+    $syncHash.UIConfigPath = "$PSScriptRoot\ScubaConfig_$Language.json"
     $syncHash.YAMLImport = $YAMLConfig
     $syncHash.Exclusions = @()
     $syncHash.Omissions = @()
@@ -287,16 +306,42 @@ Function Invoke-SCuBAConfigAppUI {
             $syncHash.YAMLConfig = Get-Content -Path $syncHash.YAMLImport -Raw | ConvertFrom-Yaml
         }
 
-        #$syncHash.AadTab.IsEnabled = $false
-        #$syncHash.DefenderTab.IsEnabled = $false
-        #$syncHash.ExoTab.IsEnabled = $false
+        #override locale context
+        foreach ($localeElement in $syncHash.UIConfigs.localeContext.PSObject.Properties) {
+            $LocaleControl = $syncHash.($localeElement.Name)
+            if ($LocaleControl){
+                #get type of control
+                switch($LocaleControl.GetType().Name) {
+                    'TextBlock' {
+                        $LocaleControl.Text = $localeElement.Value
+                    }
+                    'Button' {
+                        $LocaleControl.Content = $localeElement.Value
+                    }
+                    'ComboBox' {
+                        $LocaleControl.ToolTip = $localeElement.Value
+                    }
+                    'CheckBox' {
+                        $LocaleControl.Content = $localeElement.Value
+                    }
+                    'Label' {
+                        $LocaleControl.Content = $localeElement.Value
+                    }
+                }
+            }
+        }
+
         $syncHash.PreviewTab.IsEnabled = $false
         #===========================================================================
         # Populate Dynamic Controls from Configuration
         #===========================================================================
         # Populate M365 Environment ComboBox
         foreach ($env in $syncHash.UIConfigs.SupportedM365Environment) {
-            $syncHash.EnvironmentComboBox.Items.Add($env.displayName)
+            $comboItem = New-Object System.Windows.Controls.ComboBoxItem
+            $comboItem.Content = "$($env.displayName) ($($env.id))"
+            $comboItem.Tag = $env.id
+
+            $syncHash.EnvironmentComboBox.Items.Add($comboItem)
         }
         # Set default selection
         $syncHash.EnvironmentComboBox.SelectedIndex = 0
@@ -337,7 +382,7 @@ Function Invoke-SCuBAConfigAppUI {
             [System.Windows.Controls.Grid]::SetRow($checkBox, $row)
             [System.Windows.Controls.Grid]::SetColumn($checkBox, $column)
 
-            $syncHash.ProductsGrid.Children.Add($checkBox)
+            [void]$syncHash.ProductsGrid.Children.Add($checkBox)
 
             #omissions tab
             $OmissionTab = $syncHash.("$($product.id)OmissionTab")
@@ -400,7 +445,7 @@ Function Invoke-SCuBAConfigAppUI {
             #>
         }
         $ExclusionSupport = $syncHash.UIConfigs.products | Where-Object { $_.supportsExclusions -eq $true } | select -ExpandProperty id
-        $syncHash.ExclusionsInfoTextBlock.Text = ("Exclusions are supported for the following products: {0}" -f ($ExclusionSupport -join ', ').ToUpper())
+        $syncHash.ExclusionsInfoTextBlock.Text = ($syncHash.UIConfigs.localeContext.ExclusionsInfoTextBlock -f ($ExclusionSupport -join ', ').ToUpper())
 
         Foreach($product in $syncHash.UIConfigs.products) {
             # Initialize the OmissionTab and ExclusionTab for each product
@@ -413,8 +458,34 @@ Function Invoke-SCuBAConfigAppUI {
                 $exclusionTab.Visibility = "Collapsed"
             }
         }
+
+        # Select All/Deselect All Button
+        $syncHash.SelectAllButton.Add_Click({
+            $allProductCheckboxes = $syncHash.ProductsGrid.Children | Where-Object {
+                $_ -is [System.Windows.Controls.CheckBox] -and $_.Name -like "*ProductCheckBox"
+            }
+
+            # Check current state - if all are checked, we'll deselect all
+            $allChecked = $allProductCheckboxes | ForEach-Object { $_.IsChecked } | Where-Object { $_ -eq $true }
+
+            if ($allChecked.Count -eq $allProductCheckboxes.Count) {
+                # All are checked, so deselect all
+                foreach ($checkbox in $allProductCheckboxes) {
+                    $checkbox.IsChecked = $false
+                }
+                $syncHash.SelectAllButton.Content = "Select All"
+            } else {
+                # Not all are checked, so select all
+                foreach ($checkbox in $allProductCheckboxes) {
+                    $checkbox.IsChecked = $true
+                }
+                $syncHash.SelectAllButton.Content = "Select None"
+            }
+        })
         #===========================================================================
-        # Omissions dynamic controls
+        #
+        # OMISSIONS dynamic controls
+        #
         #===========================================================================
 
         # Function to create an omission card UI element
@@ -471,13 +542,12 @@ Function Invoke-SCuBAConfigAppUI {
                 $checkbox.IsChecked = -not $checkbox.IsChecked
             }.GetNewClosure())
 
-            <# Policy description
+            # Policy description
             $policyDesc = New-Object System.Windows.Controls.TextBlock
             $policyDesc.Text = $PolicyDescription
             $policyDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
             $policyDesc.TextWrapping = "Wrap"
             [void]$policyInfoStack.Children.Add($policyDesc)
-            #>
 
             # Add elements to header grid
             [void]$headerGrid.Children.Add($checkbox)
@@ -567,10 +637,6 @@ Function Invoke-SCuBAConfigAppUI {
             $removeButton.Foreground = [System.Windows.Media.Brushes]::White
             $removeButton.Cursor = [System.Windows.Input.Cursors]::Hand
             $removeButton.Visibility = "Collapsed"
-
-            # Style the remove button
-            #[void]$detailsPanel.Children.Add($saveButton)
-            #[void]$detailsPanel.Children.Add($removeButton)
 
             [void]$buttonPanel.Children.Add($saveButton)
             [void]$buttonPanel.Children.Add($removeButton)
@@ -703,13 +769,13 @@ Function Invoke-SCuBAConfigAppUI {
             $Container.Children.Clear()
 
             # Get baselines for this product
-            $baselines = $syncHash.UIConfigs.baselines.$ProductName
+            $baselines = $syncHash.UIConfigs.baselines.$ProductName | Select-Object id, name, rationale
 
             if ($baselines -and $baselines.Count -gt 0) {
                 #TEST $baseline = $baselines[0]
                 foreach ($baseline in $baselines) {
-                    $card = New-OmissionCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.description
-                    $Container.Children.Add($card)
+                    $card = New-OmissionCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.rationale
+                    [void]$Container.Children.Add($card)
                 }
             } else {
                 # No baselines available
@@ -719,12 +785,14 @@ Function Invoke-SCuBAConfigAppUI {
                 $noDataText.FontStyle = "Italic"
                 $noDataText.HorizontalAlignment = "Center"
                 $noDataText.Margin = "0,50,0,0"
-                $Container.Children.Add($noDataText)
+                [void]$Container.Children.Add($noDataText)
             }
         }
 
         #===========================================================================
-        # Exclusions dynamic controls
+        #
+        # EXCLUSIONS dynamic controls
+        #
         #===========================================================================
 
         # Function to create exclusion field UI based on field type and valueType
@@ -905,6 +973,151 @@ Function Invoke-SCuBAConfigAppUI {
                 [void]$fieldPanel.Children.Add($stringTextBox)
             }
 
+            If($syncHash.GraphConnected)
+            {
+                if ($Field.name -eq "Users") {
+                    $getUsersButton = New-Object System.Windows.Controls.Button
+                    $getUsersButton.Content = "Get Users"
+                    $getUsersButton.Width = 80
+                    $getUsersButton.Height = 26
+                    $getUsersButton.Margin = "8,0,0,0"
+
+                    $getUsersButton.Add_Click({
+                        try {
+                            # Get search term from input box
+                            $searchTerm = if ($inputTextBox.Text -ne $placeholder -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
+                            
+                            # Show user selector
+                            $selectedUsers = Show-UserSelector -SearchTerm $searchTerm
+                            
+                            if ($selectedUsers -and $selectedUsers.Count -gt 0) {
+                                # Clear existing items
+                                $listContainer.Children.Clear()
+                                
+                                # Add selected users to the list
+                                foreach ($user in $selectedUsers) {
+                                    $userItem = New-Object System.Windows.Controls.StackPanel
+                                    $userItem.Orientation = "Horizontal"
+                                    $userItem.Margin = "0,2,0,2"
+                                    
+                                    $userText = New-Object System.Windows.Controls.TextBlock
+                                    $userText.Text = "$($user.id)"
+                                    $userText.Width = 350
+                                    $userText.VerticalAlignment = "Center"
+                                    $userText.ToolTip = "$($user.DisplayName) ($($user.UserPrincipalName))"
+                                    
+                                    $removeUserButton = New-Object System.Windows.Controls.Button
+                                    $removeUserButton.Content = "Remove"
+                                    $removeUserButton.Width = 60
+                                    $removeUserButton.Height = 20
+                                    $removeUserButton.Margin = "8,0,0,0"
+                                    $removeUserButton.FontSize = 10
+                                    $removeUserButton.Background = [System.Windows.Media.Brushes]::Red
+                                    $removeUserButton.Foreground = [System.Windows.Media.Brushes]::White
+                                    $removeUserButton.BorderThickness = "0"
+
+                                    $removeUserButton.Add_Click({
+                                        $parentItem = $this.Parent
+                                        $parentContainer = $parentItem.Parent
+                                        $parentContainer.Children.Remove($parentItem)
+                                    }.GetNewClosure())
+                                    
+                                    [void]$userItem.Children.Add($userText)
+                                    [void]$userItem.Children.Add($removeUserButton)
+                                    [void]$listContainer.Children.Add($userItem)
+                                }
+                                
+                                # Clear the input box
+                                $inputTextBox.Text = $placeholder
+                                $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                                $inputTextBox.FontStyle = "Italic"
+                                
+                                Write-Host "Added $($selectedUsers.Count) users to exclusion list" -ForegroundColor Green
+                            }
+                        }
+                        catch {
+                            Write-Error "Error selecting users: $($_.Exception.Message)"
+                            [System.Windows.MessageBox]::Show("Error selecting users: $($_.Exception.Message)", "Error", 
+                                                            [System.Windows.MessageBoxButton]::OK, 
+                                                            [System.Windows.MessageBoxImage]::Error)
+                        }
+                    }.GetNewClosure())
+
+                    [void]$inputRow.Children.Add($getUsersButton)
+                }
+
+                # Replace the existing Get Groups button handler with:
+                elseif ($Field.name -eq "Groups") {
+                    $getGroupsButton = New-Object System.Windows.Controls.Button
+                    $getGroupsButton.Content = "Get Groups"
+                    $getGroupsButton.Width = 80
+                    $getGroupsButton.Height = 26
+                    $getGroupsButton.Margin = "8,0,0,0"
+
+                    $getGroupsButton.Add_Click({
+                        try {
+                            # Get search term from input box
+                            $searchTerm = if ($inputTextBox.Text -ne $placeholder -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
+                            
+                            # Show group selector
+                            $selectedGroups = Show-GroupSelector -SearchTerm $searchTerm
+                            
+                            if ($selectedGroups -and $selectedGroups.Count -gt 0) {
+                                # Clear existing items
+                                $listContainer.Children.Clear()
+                                
+                                # Add selected groups to the list
+                                foreach ($group in $selectedGroups) {
+                                    $groupItem = New-Object System.Windows.Controls.StackPanel
+                                    $groupItem.Orientation = "Horizontal"
+                                    $groupItem.Margin = "0,2,0,2"
+                                    
+                                    $groupText = New-Object System.Windows.Controls.TextBlock
+                                    $groupText.Text = "$($group.Id))"
+                                    $groupText.Width = 350
+                                    $groupText.VerticalAlignment = "Center"
+                                    $groupText.ToolTip = "$($group.DisplayName)"
+                                    
+                                    $removeGroupButton = New-Object System.Windows.Controls.Button
+                                    $removeGroupButton.Content = "Remove"
+                                    $removeGroupButton.Width = 60
+                                    $removeGroupButton.Height = 20
+                                    $removeGroupButton.Margin = "8,0,0,0"
+                                    $removeGroupButton.FontSize = 10
+                                    $removeGroupButton.Background = [System.Windows.Media.Brushes]::Red
+                                    $removeGroupButton.Foreground = [System.Windows.Media.Brushes]::White
+                                    $removeGroupButton.BorderThickness = "0"
+                                    
+                                    $removeGroupButton.Add_Click({
+                                        $parentItem = $this.Parent
+                                        $parentContainer = $parentItem.Parent
+                                        $parentContainer.Children.Remove($parentItem)
+                                    }.GetNewClosure())
+                                    
+                                    [void]$groupItem.Children.Add($groupText)
+                                    [void]$groupItem.Children.Add($removeGroupButton)
+                                    [void]$listContainer.Children.Add($groupItem)
+                                }
+                                
+                                # Clear the input box
+                                $inputTextBox.Text = $placeholder
+                                $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                                $inputTextBox.FontStyle = "Italic"
+                                
+                                Write-Host "Added $($selectedGroups.Count) groups to exclusion list" -ForegroundColor Green
+                            }
+                        }
+                        catch {
+                            Write-Error "Error selecting groups: $($_.Exception.Message)"
+                            [System.Windows.MessageBox]::Show("Error selecting groups: $($_.Exception.Message)", "Error", 
+                                                            [System.Windows.MessageBoxButton]::OK, 
+                                                            [System.Windows.MessageBoxImage]::Error)
+                        }
+                    }.GetNewClosure())
+
+                    [void]$inputRow.Children.Add($getGroupsButton)
+                }
+            }
             [void]$Container.Children.Add($fieldPanel)
         }
 
@@ -1211,11 +1424,11 @@ Function Invoke-SCuBAConfigAppUI {
             $Container.Children.Clear()
 
             # Get baselines for this product that support exclusions
-            $baselines = $syncHash.UIConfigs.baselines.$ProductName | Where-Object { $_.exclusionType -and $_.exclusionType -ne 'none' }
+            $baselines = $syncHash.UIConfigs.baselines.$ProductName | Where-Object { $_.exclusionType -ne 'none' } | Select-Object id, name, rationale, exclusionType
 
             if ($baselines -and $baselines.Count -gt 0) {
                 foreach ($baseline in $baselines) {
-                    $card = New-ExclusionCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.description -ExclusionType $baseline.exclusionType
+                    $card = New-ExclusionCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.rationale -ExclusionType $baseline.exclusionType
                     if ($card) {
                         $Container.Children.Add($card)
                     }
@@ -1229,6 +1442,107 @@ Function Invoke-SCuBAConfigAppUI {
                 $noDataText.HorizontalAlignment = "Center"
                 $noDataText.Margin = "0,50,0,0"
                 $Container.Children.Add($noDataText)
+            }
+        }
+
+        #===========================================================================
+        #
+        # GRAPH controls
+        #
+        #===========================================================================
+        
+        # Enhanced Graph Query Function with Filter Support
+        function Invoke-GraphQueryWithFilter {
+            param(
+                [string]$QueryType,
+                $GraphConfig,
+                [string]$FilterString,
+                [int]$Top = 500,
+                [string]$ProgressMessage = "Retrieving data..."
+            )
+
+            # Create runspace
+            $runspace = [runspacefactory]::CreateRunspace()
+            $runspace.Open()
+
+            # Create PowerShell instance
+            $powershell = [powershell]::Create()
+            $powershell.Runspace = $runspace
+
+            # Add script block
+            $scriptBlock = {
+                param($QueryType, $GraphConfig, $FilterString, $Top, $ProgressMessage)
+
+                try {
+                    # Get query configuration
+                    $queryConfig = $GraphConfig.$QueryType
+                    if (-not $queryConfig) {
+                        throw "Query configuration not found for: $QueryType"
+                    }
+
+                    # Build query parameters
+                    $queryParams = @{
+                        Uri = $queryConfig.endpoint
+                        Method = "Get"
+                    }
+
+                    # Build query string
+                    $queryStringParts = @()
+
+                    # Add existing query parameters from config
+                    if ($queryConfig.queryParameters) {
+                        foreach ($param in $queryConfig.queryParameters.psobject.properties.name) {
+                            if ($param -ne '$top') {  # We'll handle $top separately
+                                $queryStringParts += "$param=$($queryConfig.queryParameters.$param)"
+                            }
+                        }
+                    }
+
+                    # Add filter if provided
+                    if (![string]::IsNullOrWhiteSpace($FilterString)) {
+                        $queryStringParts += "`$filter=$FilterString"
+                    }
+
+                    # Add top parameter
+                    $queryStringParts += "`$top=$Top"
+
+                    # Combine query string
+                    if ($queryStringParts.Count -gt 0) {
+                        $queryParams.Uri += "?" + ($queryStringParts -join "&")
+                    }
+
+                    Write-Host "Graph Query URI: $($queryParams.Uri)" -ForegroundColor Cyan
+
+                    # Execute the Graph request
+                    $result = Invoke-MgGraphRequest @queryParams
+
+                    # Return the result
+                    return @{
+                        Success = $true
+                        Data = $result
+                        QueryConfig = $queryConfig
+                        Message = "Successfully retrieved $($result.value.Count) items"
+                        FilterApplied = ![string]::IsNullOrWhiteSpace($FilterString)
+                    }
+                }
+                catch {
+                    return @{
+                        Success = $false
+                        Error = $_.Exception.Message
+                        Message = "Failed to retrieve data from uri [{0}]: {1}" -f $queryParams.Uri, $($_.Exception.Message)
+                        FilterApplied = ![string]::IsNullOrWhiteSpace($FilterString)
+                    }
+                }
+            }
+
+            # Add parameters and start execution
+            $powershell.AddScript($scriptBlock).AddParameter("QueryType", $QueryType).AddParameter("GraphConfig", $GraphConfig).AddParameter("FilterString", $FilterString).AddParameter("Top", $Top).AddParameter("ProgressMessage", $ProgressMessage)
+            $asyncResult = $powershell.BeginInvoke()
+
+            return @{
+                PowerShell = $powershell
+                AsyncResult = $asyncResult
+                Runspace = $runspace
             }
         }
 
@@ -1381,7 +1695,7 @@ Function Invoke-SCuBAConfigAppUI {
             $result = $folderDialog.ShowDialog()
             if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
                 $syncHash.OutPathTextBox.Text = $folderDialog.SelectedPath
-                New-YamlPreview
+                #New-YamlPreview
             }
         })
 
@@ -1398,23 +1712,23 @@ Function Invoke-SCuBAConfigAppUI {
             $result = $folderDialog.ShowDialog()
             if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
                 $syncHash.OpaPathTextBox.Text = $folderDialog.SelectedPath
-                New-YamlPreview
+                #New-YamlPreview
             }
         })
 
         # Select Certificate Button
         $syncHash.SelectCertificateButton.Add_Click({
-            Show-CertificateSelector
-        })
-
-        Function Show-CertificateSelector {
             try {
+                Write-Host "Certificate selection started..." -ForegroundColor Yellow
+                
                 # Get user certificates
                 $userCerts = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where-Object {
                     $_.HasPrivateKey -and
                     $_.NotAfter -gt (Get-Date) -and
                     $_.Subject -notlike "*Microsoft*"
                 } | Sort-Object Subject
+
+                Write-Host "Found $($userCerts.Count) certificates" -ForegroundColor Cyan
 
                 if ($userCerts.Count -eq 0) {
                     [System.Windows.MessageBox]::Show("No suitable certificates found in the current user's personal certificate store.",
@@ -1424,62 +1738,8 @@ Function Invoke-SCuBAConfigAppUI {
                     return
                 }
 
-                # Create certificate selection window
-                $certWindow = New-Object System.Windows.Window
-                $certWindow.Title = "Select Certificate"
-                $certWindow.Width = 600
-                $certWindow.Height = 400
-                $certWindow.WindowStartupLocation = "CenterOwner"
-                $certWindow.Owner = $syncHash.Window
-                $certWindow.Background = [System.Windows.Media.Brushes]::White
-
-                # Create main grid
-                $mainGrid = New-Object System.Windows.Controls.Grid
-                $rowDef1 = New-Object System.Windows.Controls.RowDefinition
-                $rowDef1.Height = [System.Windows.GridLength]::new(1, [System.Windows.GridUnitType]::Star)
-                $rowDef2 = New-Object System.Windows.Controls.RowDefinition
-                $rowDef2.Height = [System.Windows.GridLength]::Auto
-                $mainGrid.RowDefinitions.Add($rowDef1)
-                $mainGrid.RowDefinitions.Add($rowDef2)
-
-                # Create DataGrid for certificates
-                $dataGrid = New-Object System.Windows.Controls.DataGrid
-                $dataGrid.AutoGenerateColumns = $false
-                $dataGrid.CanUserAddRows = $false
-                $dataGrid.CanUserDeleteRows = $false
-                $dataGrid.IsReadOnly = $true
-                $dataGrid.SelectionMode = [System.Windows.Controls.DataGridSelectionMode]::Single
-                $dataGrid.GridLinesVisibility = [System.Windows.Controls.DataGridGridLinesVisibility]::Horizontal
-                $dataGrid.HeadersVisibility = [System.Windows.Controls.DataGridHeadersVisibility]::Column
-                $dataGrid.Margin = "10"
-
-                # Create columns
-                $subjectColumn = New-Object System.Windows.Controls.DataGridTextColumn
-                $subjectColumn.Header = "Subject"
-                $subjectColumn.Binding = New-Object System.Windows.Data.Binding("Subject")
-                $subjectColumn.Width = 250
-                $dataGrid.Columns.Add($subjectColumn)
-
-                $issuerColumn = New-Object System.Windows.Controls.DataGridTextColumn
-                $issuerColumn.Header = "Issued By"
-                $issuerColumn.Binding = New-Object System.Windows.Data.Binding("Issuer")
-                $issuerColumn.Width = 200
-                $dataGrid.Columns.Add($issuerColumn)
-
-                $expiryColumn = New-Object System.Windows.Controls.DataGridTextColumn
-                $expiryColumn.Header = "Expires"
-                $expiryColumn.Binding = New-Object System.Windows.Data.Binding("NotAfter")
-                $expiryColumn.Width = 100
-                $dataGrid.Columns.Add($expiryColumn)
-
-                $thumbprintColumn = New-Object System.Windows.Controls.DataGridTextColumn
-                $thumbprintColumn.Header = "Thumbprint"
-                $thumbprintColumn.Binding = New-Object System.Windows.Data.Binding("Thumbprint")
-                $thumbprintColumn.Width = 120
-                $dataGrid.Columns.Add($thumbprintColumn)
-
-                # Bind data
-                $certData = $userCerts | ForEach-Object {
+                # Prepare data for display
+                $displayCerts = $userCerts | ForEach-Object {
                     [PSCustomObject]@{
                         Subject = $_.Subject
                         Issuer = $_.Issuer
@@ -1487,11 +1747,406 @@ Function Invoke-SCuBAConfigAppUI {
                         Thumbprint = $_.Thumbprint
                         Certificate = $_
                     }
-                }
-                $dataGrid.ItemsSource = $certData
+                } | Sort-Object Subject
 
-                [System.Windows.Controls.Grid]::SetRow($dataGrid, 0)
-                $mainGrid.Children.Add($dataGrid)
+                # Column configuration
+                $columnConfig = @{
+                    Subject = @{ Header = "Subject"; Width = 250 }
+                    Issuer = @{ Header = "Issued By"; Width = 200 }
+                    NotAfter = @{ Header = "Expires"; Width = 100 }
+                    Thumbprint = @{ Header = "Thumbprint"; Width = 120 }
+                }
+
+            
+                # Show selector (single selection only for certificates)
+                $selectedCerts = Show-UniversalSelector -Title "Select Certificate" -SearchPlaceholder "Search by subject..." -Items $displayCerts -ColumnConfig $columnConfig -SearchProperty "Subject"
+
+                if ($selectedCerts -and $selectedCerts.Count -gt 0) {
+                    # Get the first (and only) selected certificate
+                    $selectedCert = $selectedCerts[0]
+                    
+                    $syncHash.CertificateTextBox.Text = $selectedCert.Thumbprint
+                    
+                } 
+            }
+            catch {
+
+                [System.Windows.MessageBox]::Show("Error loading certificates: $($_.Exception.Message)",
+                                                "Error",
+                                                [System.Windows.MessageBoxButton]::OK,
+                                                [System.Windows.MessageBoxImage]::Error)
+            }
+        })
+
+
+        #===========================================================================
+        # Simplified User Selection Function
+        #===========================================================================
+        function Show-UserSelector {
+            param(
+                [string]$SearchTerm = "",
+                [int]$Top = 100
+            )
+            
+            try {
+
+                # Build filter string for UPN contains
+                $filterString = $null
+                if (![string]::IsNullOrWhiteSpace($SearchTerm)) {
+                    $filterString = "startswith(userPrincipalName,'$SearchTerm')"
+                }
+
+                # Show progress
+                $progressWindow = New-Object System.Windows.Window
+                $progressWindow.Title = "Loading Users"
+                $progressWindow.Width = 300
+                $progressWindow.Height = 120
+                $progressWindow.WindowStartupLocation = "CenterOwner"
+                $progressWindow.Owner = $syncHash.Window
+                $progressWindow.Background = [System.Windows.Media.Brushes]::White
+
+                $progressPanel = New-Object System.Windows.Controls.StackPanel
+                $progressPanel.Margin = "20"
+                $progressPanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+                $progressPanel.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+
+                $progressLabel = New-Object System.Windows.Controls.Label
+                $progressLabel.Content = "Loading users..."
+                $progressLabel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+
+                $progressBar = New-Object System.Windows.Controls.ProgressBar
+                $progressBar.Width = 200
+                $progressBar.Height = 20
+                $progressBar.IsIndeterminate = $true
+
+                [void]$progressPanel.Children.Add($progressLabel)
+                [void]$progressPanel.Children.Add($progressBar)
+                $progressWindow.Content = $progressPanel
+
+                # Start async operation
+                $asyncOp = Invoke-GraphQueryWithFilter -QueryType "users" -GraphConfig $syncHash.UIConfigs.graphQueries -FilterString $filterString -Top $Top
+
+                # Show progress window
+                $progressWindow.Show()
+
+                # Wait for completion
+                while (-not $asyncOp.AsyncResult.IsCompleted) {
+                    [System.Windows.Forms.Application]::DoEvents()
+                    Start-Sleep -Milliseconds 100
+                }
+
+                # Close progress window
+                $progressWindow.Close()
+
+                # Get results
+                $result = $asyncOp.PowerShell.EndInvoke($asyncOp.AsyncResult)
+                $asyncOp.PowerShell.Dispose()
+                $asyncOp.Runspace.Close()
+                $asyncOp.Runspace.Dispose()
+
+                if ($result.Success) {
+                    $users = $result.Data.value
+                    if (-not $users -or $users.Count -eq 0) {
+                        [System.Windows.MessageBox]::Show("No users found matching the search criteria.", "No Users Found",
+                                                        [System.Windows.MessageBoxButton]::OK,
+                                                        [System.Windows.MessageBoxImage]::Information)
+                        return $null
+                    }
+
+                    # Prepare data for display
+                    $displayUsers = $users | ForEach-Object {
+                        [PSCustomObject]@{
+                            DisplayName = $_.DisplayName
+                            UserPrincipalName = $_.UserPrincipalName
+                            Department = $_.Department
+                            JobTitle = $_.JobTitle
+                            AccountEnabled = $_.AccountEnabled
+                            Id = $_.Id
+                            OriginalObject = $_
+                        }
+                    } | Sort-Object DisplayName
+
+                    # Column configuration
+                    $columnConfig = @{
+                        DisplayName = @{ Header = "Display Name"; Width = 200 }
+                        UserPrincipalName = @{ Header = "User Principal Name"; Width = 250 }
+                        Department = @{ Header = "Department"; Width = 120 }
+                        JobTitle = @{ Header = "Job Title"; Width = 120 }
+                        AccountEnabled = @{ Header = "Enabled"; Width = 80 }
+                    }
+
+                    # Show selector
+                    $selectedUsers = Show-UniversalSelector -Title "Select Users" -SearchPlaceholder "Search by display name..." -Items $displayUsers -ColumnConfig $columnConfig -SearchProperty "DisplayName" -AllowMultiple
+
+                    return $selectedUsers
+                }
+                else {
+                    [System.Windows.MessageBox]::Show($result.Message, "Error",
+                                                    [System.Windows.MessageBoxButton]::OK,
+                                                    [System.Windows.MessageBoxImage]::Error)
+                    return $null
+                }
+            }
+            catch {
+                [System.Windows.MessageBox]::Show("Error loading users: $($_.Exception.Message)", "Error",
+                                                [System.Windows.MessageBoxButton]::OK,
+                                                [System.Windows.MessageBoxImage]::Error)
+                return $null
+            }
+        }
+
+        #===========================================================================
+        # Simplified Group Selection Function
+        #===========================================================================
+        function Show-GroupSelector {
+            param(
+                [string]$SearchTerm = "",
+                [int]$Top = 100
+            )
+            
+            try {
+
+                # Build filter string for group name contains
+                $filterString = $null
+                if (![string]::IsNullOrWhiteSpace($SearchTerm)) {
+                    $filterString = "startswith(displayName,'$SearchTerm')"
+                }
+
+                # Show progress
+                $progressWindow = New-Object System.Windows.Window
+                $progressWindow.Title = "Loading Groups"
+                $progressWindow.Width = 300
+                $progressWindow.Height = 120
+                $progressWindow.WindowStartupLocation = "CenterOwner"
+                $progressWindow.Owner = $syncHash.Window
+                $progressWindow.Background = [System.Windows.Media.Brushes]::White
+
+                $progressPanel = New-Object System.Windows.Controls.StackPanel
+                $progressPanel.Margin = "20"
+                $progressPanel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+                $progressPanel.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+
+                $progressLabel = New-Object System.Windows.Controls.Label
+                $progressLabel.Content = "Loading groups..."
+                $progressLabel.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Center
+
+                $progressBar = New-Object System.Windows.Controls.ProgressBar
+                $progressBar.Width = 200
+                $progressBar.Height = 20
+                $progressBar.IsIndeterminate = $true
+
+                [void]$progressPanel.Children.Add($progressLabel)
+                [void]$progressPanel.Children.Add($progressBar)
+                $progressWindow.Content = $progressPanel
+
+                # Start async operation
+                $asyncOp = Invoke-GraphQueryWithFilter -QueryType "groups" -GraphConfig $syncHash.UIConfigs.graphQueries -FilterString $filterString -Top $Top
+
+                # Show progress window
+                $progressWindow.Show()
+
+                # Wait for completion
+                while (-not $asyncOp.AsyncResult.IsCompleted) {
+                    [System.Windows.Forms.Application]::DoEvents()
+                    Start-Sleep -Milliseconds 100
+                }
+
+                # Close progress window
+                $progressWindow.Close()
+
+                # Get results
+                $result = $asyncOp.PowerShell.EndInvoke($asyncOp.AsyncResult)
+                $asyncOp.PowerShell.Dispose()
+                $asyncOp.Runspace.Close()
+                $asyncOp.Runspace.Dispose()
+
+                if ($result.Success) {
+                    $groups = $result.Data.value
+                    if (-not $groups -or $groups.Count -eq 0) {
+                        [System.Windows.MessageBox]::Show("No groups found matching the search criteria.", "No Groups Found",
+                                                        [System.Windows.MessageBoxButton]::OK,
+                                                        [System.Windows.MessageBoxImage]::Information)
+                        return $null
+                    }
+
+                    # Prepare data for display
+                    $displayGroups = $groups | ForEach-Object {
+                        $groupType = "Distribution"
+                        if ($_.SecurityEnabled) { $groupType = "Security" }
+                        if ($_.GroupTypes -contains "Unified") { $groupType = "Microsoft 365" }
+                        
+                        [PSCustomObject]@{
+                            DisplayName = $_.DisplayName
+                            Description = $_.Description
+                            GroupType = $groupType
+                            Mail = $_.Mail
+                            Id = $_.Id
+                            OriginalObject = $_
+                        }
+                    } | Sort-Object DisplayName
+
+                    # Column configuration
+                    $columnConfig = @{
+                        DisplayName = @{ Header = "Group Name"; Width = 200 }
+                        Description = @{ Header = "Description"; Width = 250 }
+                        GroupType = @{ Header = "Type"; Width = 100 }
+                        Mail = @{ Header = "Email"; Width = 150 }
+                    }
+
+                    # Show selector
+                    $selectedGroups = Show-UniversalSelector -Title "Select Groups" -SearchPlaceholder "Search by group name..." -Items $displayGroups -ColumnConfig $columnConfig -SearchProperty "DisplayName" -AllowMultiple
+
+                    return $selectedGroups
+                }
+                else {
+                    [System.Windows.MessageBox]::Show($result.Message, "Error",
+                                                    [System.Windows.MessageBoxButton]::OK,
+                                                    [System.Windows.MessageBoxImage]::Error)
+                    return $null
+                }
+            }
+            catch {
+                [System.Windows.MessageBox]::Show("Error loading groups: $($_.Exception.Message)", "Error",
+                                                [System.Windows.MessageBoxButton]::OK,
+                                                [System.Windows.MessageBoxImage]::Error)
+                return $null
+            }
+        }
+
+        #===========================================================================
+        # Universal Selection Function
+        #===========================================================================
+        function Show-UniversalSelector {
+            param(
+                [Parameter(Mandatory)]
+                [string]$Title,
+                
+                [Parameter(Mandatory)]
+                [string]$SearchPlaceholder,
+                
+                [Parameter(Mandatory)]
+                [array]$Items,
+                
+                [Parameter(Mandatory)]
+                [hashtable]$ColumnConfig,
+                
+                [Parameter()]
+                [string]$SearchProperty = "DisplayName",
+                
+                [Parameter()]
+                [string]$ReturnProperty = "Id",
+                
+                [Parameter()]
+                [switch]$AllowMultiple
+            )
+            
+            try {
+                # Create selection window
+                $selectionWindow = New-Object System.Windows.Window
+                $selectionWindow.Title = $Title
+                $selectionWindow.Width = 700
+                $selectionWindow.Height = 500
+                $selectionWindow.WindowStartupLocation = "CenterOwner"
+                $selectionWindow.Owner = $syncHash.Window
+                $selectionWindow.Background = [System.Windows.Media.Brushes]::White
+
+                # Create main grid
+                $mainGrid = New-Object System.Windows.Controls.Grid
+                $rowDef1 = New-Object System.Windows.Controls.RowDefinition
+                $rowDef1.Height = [System.Windows.GridLength]::Auto
+                $rowDef2 = New-Object System.Windows.Controls.RowDefinition
+                $rowDef2.Height = [System.Windows.GridLength]::new(1, [System.Windows.GridUnitType]::Star)
+                $rowDef3 = New-Object System.Windows.Controls.RowDefinition
+                $rowDef3.Height = [System.Windows.GridLength]::Auto
+                [void]$mainGrid.RowDefinitions.Add($rowDef1)
+                [void]$mainGrid.RowDefinitions.Add($rowDef2)
+                [void]$mainGrid.RowDefinitions.Add($rowDef3)
+
+                # Search panel
+                $searchPanel = New-Object System.Windows.Controls.StackPanel
+                $searchPanel.Orientation = [System.Windows.Controls.Orientation]::Horizontal
+                $searchPanel.Margin = "10"
+
+                $searchLabel = New-Object System.Windows.Controls.Label
+                $searchLabel.Content = "Search:"
+                $searchLabel.Width = 60
+                $searchLabel.VerticalAlignment = [System.Windows.VerticalAlignment]::Center
+
+                $searchBox = New-Object System.Windows.Controls.TextBox
+                $searchBox.Width = 300
+                $searchBox.Height = 25
+                $searchBox.Text = $SearchPlaceholder
+                $searchBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                $searchBox.FontStyle = [System.Windows.FontStyles]::Italic
+                $searchBox.Margin = "5,0"
+
+                # Search box placeholder functionality
+                $searchBox.Add_GotFocus({
+                    if ($searchBox.Text -eq $SearchPlaceholder) {
+                        $searchBox.Text = ""
+                        $searchBox.Foreground = [System.Windows.Media.Brushes]::Black
+                        $searchBox.FontStyle = [System.Windows.FontStyles]::Normal
+                    }
+                })
+
+                $searchBox.Add_LostFocus({
+                    if ([string]::IsNullOrWhiteSpace($searchBox.Text)) {
+                        $searchBox.Text = $SearchPlaceholder
+                        $searchBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                        $searchBox.FontStyle = [System.Windows.FontStyles]::Italic
+                    }
+                })
+
+                [void]$searchPanel.Children.Add($searchLabel)
+                [void]$searchPanel.Children.Add($searchBox)
+
+                [System.Windows.Controls.Grid]::SetRow($searchPanel, 0)
+                [void]$mainGrid.Children.Add($searchPanel)
+
+                # Create DataGrid
+                $dataGrid = New-Object System.Windows.Controls.DataGrid
+                $dataGrid.AutoGenerateColumns = $false
+                $dataGrid.CanUserAddRows = $false
+                $dataGrid.CanUserDeleteRows = $false
+                $dataGrid.IsReadOnly = $true
+                $dataGrid.SelectionMode = if ($AllowMultiple) { [System.Windows.Controls.DataGridSelectionMode]::Extended } else { [System.Windows.Controls.DataGridSelectionMode]::Single }
+                $dataGrid.GridLinesVisibility = [System.Windows.Controls.DataGridGridLinesVisibility]::Horizontal
+                $dataGrid.HeadersVisibility = [System.Windows.Controls.DataGridHeadersVisibility]::Column
+                $dataGrid.Margin = "10"
+
+                # Create columns based on config
+                foreach ($columnKey in $ColumnConfig.Keys) {
+                    $column = New-Object System.Windows.Controls.DataGridTextColumn
+                    $column.Header = $ColumnConfig[$columnKey].Header
+                    $column.Binding = New-Object System.Windows.Data.Binding($columnKey)
+                    $column.Width = $ColumnConfig[$columnKey].Width
+                    $dataGrid.Columns.Add($column)
+                }
+
+                # Store original items for filtering
+                $originalItems = $Items
+
+                # Filter function
+                $FilterItems = {
+                    $searchText = $searchBox.Text.ToLower()
+                    if ([string]::IsNullOrWhiteSpace($searchText) -or $searchText -eq $SearchPlaceholder.ToLower()) {
+                        $dataGrid.ItemsSource = $originalItems
+                    } else {
+                        $filteredItems = $originalItems | Where-Object { 
+                            $_.$SearchProperty.ToLower().Contains($searchText)
+                        }
+                        $dataGrid.ItemsSource = $filteredItems
+                    }
+                }
+
+                # Initial load
+                $dataGrid.ItemsSource = $originalItems
+
+                # Search on text change
+                $searchBox.Add_TextChanged($FilterItems)
+
+                [System.Windows.Controls.Grid]::SetRow($dataGrid, 1)
+                [void]$mainGrid.Children.Add($dataGrid)
 
                 # Create button panel
                 $buttonPanel = New-Object System.Windows.Controls.StackPanel
@@ -1512,54 +2167,61 @@ Function Invoke-SCuBAConfigAppUI {
                 $cancelButton.Height = 30
                 $cancelButton.IsCancel = $true
 
-                $buttonPanel.Children.Add($selectButton)
-                $buttonPanel.Children.Add($cancelButton)
+                [void]$buttonPanel.Children.Add($selectButton)
+                [void]$buttonPanel.Children.Add($cancelButton)
 
-                [System.Windows.Controls.Grid]::SetRow($buttonPanel, 1)
-                $mainGrid.Children.Add($buttonPanel)
+                [System.Windows.Controls.Grid]::SetRow($buttonPanel, 2)
+                [void]$mainGrid.Children.Add($buttonPanel)
 
-                $certWindow.Content = $mainGrid
+                $selectionWindow.Content = $mainGrid
 
                 # Event handlers
                 $selectButton.Add_Click({
-                    if ($dataGrid.SelectedItem) {
-                        $selectedCert = $dataGrid.SelectedItem.Certificate
-                        $syncHash.CertificateTextBox.Text = $selectedCert.Thumbprint
-                        $certWindow.DialogResult = $true
-                        $certWindow.Close()
-                        New-YamlPreview
+                    if ($dataGrid.SelectedItems.Count -gt 0) {
+                        $selectedResults = @()
+                        foreach ($selectedItem in $dataGrid.SelectedItems) {
+                            $selectedResults += $selectedItem
+                        }
+                        $selectionWindow.Tag = $selectedResults
+                        $selectionWindow.DialogResult = $true
+                        $selectionWindow.Close()
                     } else {
-                        [System.Windows.MessageBox]::Show("Please select a certificate.", "No Selection",
+                        [System.Windows.MessageBox]::Show("Please select an item.", "No Selection",
                                                         [System.Windows.MessageBoxButton]::OK,
                                                         [System.Windows.MessageBoxImage]::Warning)
                     }
                 })
 
                 $cancelButton.Add_Click({
-                    $certWindow.DialogResult = $false
-                    $certWindow.Close()
+                    $selectionWindow.DialogResult = $false
+                    $selectionWindow.Close()
                 })
 
                 $dataGrid.Add_MouseDoubleClick({
                     if ($dataGrid.SelectedItem) {
-                        $selectedCert = $dataGrid.SelectedItem.Certificate
-                        $syncHash.CertificateTextBox.Text = $selectedCert.Thumbprint
-                        $certWindow.DialogResult = $true
-                        $certWindow.Close()
-                        New-YamlPreview
+                        $selectionWindow.Tag = @($dataGrid.SelectedItem)
+                        $selectionWindow.DialogResult = $true
+                        $selectionWindow.Close()
                     }
                 })
 
                 # Show dialog
-                $certWindow.ShowDialog()
+                $result = $selectionWindow.ShowDialog()
+
+                if ($result -eq $true) {
+                    return $selectionWindow.Tag
+                }
+                return $null
             }
             catch {
-                [System.Windows.MessageBox]::Show("Error loading certificates: $($_.Exception.Message)",
+                [System.Windows.MessageBox]::Show("Error in selection: $($_.Exception.Message)",
                                                 "Error",
                                                 [System.Windows.MessageBoxButton]::OK,
                                                 [System.Windows.MessageBoxImage]::Error)
+                return $null
             }
         }
+
         #===========================================================================
         # Validation Functions
         #===========================================================================
@@ -1893,9 +2555,9 @@ Function Invoke-SCuBAConfigAppUI {
                 }
 
                 # Validate and enable preview if organization is valid
-                if (Confirm-UIFields) {
+                #if (Confirm-UIFields) {
                     $syncHash.PreviewTab.IsEnabled = $true
-                }
+                #}
 
                 # Force update the preview
                 New-YamlPreview
@@ -1976,16 +2638,9 @@ Function Invoke-SCuBAConfigAppUI {
             $orgUnit = if ($syncHash.OrgUnitTextBox.Text -ne $syncHash.OrgUnitPlaceholder) { $syncHash.OrgUnitTextBox.Text } else { "" }
             $description = if ($syncHash.DescriptionTextBox.Text -ne $syncHash.DescriptionPlaceholder) { $syncHash.DescriptionTextBox.Text } else { "" }
 
-            $selectedEnv = $syncHash.UIConfigs.SupportedM365Environment | Where-Object { $_.displayName -eq $syncHash.EnvironmentComboBox.SelectedItem } | Select-Object -ExpandProperty id
-
-            $selectedProducts = @()
-            foreach ($item in $syncHash.ProductsGrid.Children) {
-                if ($item -is [System.Windows.Controls.CheckBox] -and
-                    $item.Name -like "*ProductCheckBox" -and
-                    $item.IsChecked) {
-                    $selectedProducts += $item.Tag
-                }
-            }
+            #$selectedEnv = $syncHash.UIConfigs.SupportedM365Environment | Where-Object { $_.displayName -eq $syncHash.EnvironmentComboBox.SelectedItem } | Select-Object -ExpandProperty id
+            #grab tag
+            $selectedEnv = $syncHash.EnvironmentComboBox.SelectedItem.Tag
 
             # Generate YAML preview
             $yamlPreview = @()
@@ -2001,11 +2656,30 @@ $description
 "@
             }
             $yamlPreview += "`n`n# Configuration Details"
-            $yamlPreview += @"
-`nProductNames:
-"@
-            foreach ($product in $selectedProducts) {
-                $yamlPreview += "`n  - $product"
+
+            $selectedProducts = @()
+            foreach ($item in $syncHash.ProductsGrid.Children) {
+                if ($item -is [System.Windows.Controls.CheckBox] -and
+                    $item.Name -like "*ProductCheckBox" -and
+                    $item.IsChecked) {
+                    $selectedProducts += $item.Tag
+                }
+            }
+
+            # Check if all products are selected
+            $allProductCheckboxes = $syncHash.ProductsGrid.Children | Where-Object {
+                $_ -is [System.Windows.Controls.CheckBox] -and $_.Name -like "*ProductCheckBox"
+            }
+
+            if ($selectedProducts.Count -eq $allProductCheckboxes.Count -and $selectedProducts.Count -gt 0) {
+                # All products are selected, use wildcard
+                $yamlPreview += "`nProductNames: ['*']"
+            } else {
+                # Not all products selected, list them individually
+                $yamlPreview += "`nProductNames:"
+                foreach ($product in $selectedProducts) {
+                    $yamlPreview += "`n  - $product"
+                }
             }
 
             $yamlPreview += "`n`nM365Environment: $selectedEnv"
@@ -2035,7 +2709,7 @@ $description
 
                 # Add OutPath (always include if section is toggled)
                 $outPath = if (![string]::IsNullOrWhiteSpace($syncHash.OutPathTextBox.Text)) { $syncHash.OutPathTextBox.Text } else { "." }
-                $yamlPreview += "`nOutPath: `"$outPath`""
+                $yamlPreview += "`nOutPath: `"$($outPath.replace('\', '\\'))`""
 
                 # Add OutFolderName (always include if section is toggled)
                 $outFolderName = if (![string]::IsNullOrWhiteSpace($syncHash.OutFolderNameTextBox.Text)) { $syncHash.OutFolderNameTextBox.Text } else { "M365BaselineConformance" }
@@ -2056,7 +2730,7 @@ $description
 
                 # Add OpaPath (always include if section is toggled)
                 $opaPath = if (![string]::IsNullOrWhiteSpace($syncHash.OpaPathTextBox.Text)) { $syncHash.OpaPathTextBox.Text } else { "." }
-                $yamlPreview += "`nOPAPath: `"$opaPath`""
+                $yamlPreview += "`nOPAPath: `"$($opaPath.replace('\', '\\'))`""
             }
 
             # General Section
@@ -2071,11 +2745,7 @@ $description
                 $disconnectOnExit = if ($syncHash.DisconnectOnExitCheckBox.IsChecked) { "true" } else { "false" }
                 $yamlPreview += "`nDisconnectOnExit: $disconnectOnExit"
             }
-            else {
-                # If General section is not toggled, add default values
-                $yamlPreview += "`nLogIn: true"
-                $yamlPreview += "`nDisconnectOnExit: false"
-            }
+
 
             # list exclusions psobject
             # members: Id, Product, TypeName, FieldName, FieldValue
@@ -2243,6 +2913,6 @@ $description
     If($Passthru){
         return $Data
     }
-    
+
 }
 
