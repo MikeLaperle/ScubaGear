@@ -1,0 +1,842 @@
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="ScubaGear Configuration Editor"
+    Height="855"
+    Width="1200"
+    WindowStartupLocation="CenterScreen"
+    Background="#F6FBFE"
+    >
+
+    <Window.Resources>
+        <!-- Colors from the ScubaGear theme -->
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#3D5B96"/>
+        <!-- Deep blue -->
+        <SolidColorBrush x:Key="AccentBrush" Color="#62C0DA"/>
+        <!-- Teal accent -->
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#F9FAFC"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#D0D5E0"/>
+        <SolidColorBrush x:Key="SecondaryBrush" Color="#8CC9E8"/>
+        <!-- Light blue -->
+        <SolidColorBrush x:Key="TextBrush" Color="#333333"/>
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#666666"/>
+
+        <!-- Button Styles -->
+        <Style TargetType="Button" x:Key="PrimaryButton">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#2E4A85"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#1D3A74"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="Button" x:Key="SecondaryButton">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F5F5F5"/>
+                    <Setter Property="BorderBrush" Value="#BBBBBB"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#EEEEEE"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="Button" x:Key="AccentButton">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#51B0C9"/>
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#3FA0B9"/>
+                </Trigger>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.6"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Toggle Switch Style -->
+        <Style x:Key="ToggleSwitch" TargetType="CheckBox">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Border x:Name="ToggleBorder" Width="44" Height="24" CornerRadius="12"
+                                Background="#CCCCCC" BorderThickness="1" BorderBrush="#AAAAAA">
+                            <Ellipse x:Name="ToggleThumb" Width="18" Height="18" Fill="White"
+                                    HorizontalAlignment="Left" Margin="2,0,0,0"
+                                    RenderTransformOrigin="0.5,0.5">
+                                <Ellipse.RenderTransform>
+                                    <TranslateTransform X="0"/>
+                                </Ellipse.RenderTransform>
+                            </Ellipse>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="ToggleBorder" Property="Background" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter TargetName="ToggleThumb" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TranslateTransform X="20"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Card Style -->
+        <Style TargetType="Border" x:Key="Card">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="16"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect ShadowDepth="1" BlurRadius="4" Opacity="0.1" Direction="270" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TabControl">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Tab Headers Panel -->
+                            <Border Background="#EAF6FF" CornerRadius="8" Margin="0,0,0,8">
+                                <TabPanel x:Name="HeaderPanel"
+                                  IsItemsHost="True"
+                                  Background="Transparent"
+                                  Margin="8,4"/>
+                            </Border>
+
+                            <!-- Content Panel -->
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                      Grid.Row="1"
+                                      Margin="0"
+                                      ContentSource="SelectedContent"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PillTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Width" Value="130"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="6"
+                        Padding="{TemplateBinding Padding}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="1">
+                            <ContentPresenter x:Name="Content"
+                                      ContentSource="Header"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Panel.ZIndex" Value="100"/>
+                                <Setter TargetName="Bd" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect ShadowDepth="1"
+                                              BlurRadius="4"
+                                              Opacity="0.1"
+                                              Direction="270"/>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Bd" Property="Background" Value="#F9F9F9"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F2F9FF"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#A0A0A0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tab Button Style -->
+        <Style TargetType="RadioButton" x:Key="TabButton">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="border"
+                                Background="Transparent"
+                                BorderThickness="0,0,0,2"
+                                BorderBrush="Transparent"
+                                Padding="16,10">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter TargetName="border" Property="Background" Value="#F0F5FF"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#F0F0F0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Style.Triggers>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                    <Setter Property="FontWeight" Value="SemiBold"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Form Styles -->
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4">
+                            <ScrollViewer x:Name="PART_ContentHost"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsFocused" Value="True">
+                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Vertical">
+                <TextBlock Text="ScubaGear Configuration Editor"
+                           FontSize="22"
+                           FontWeight="Bold"
+                           Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock Text="Create a ScubaGear configuration file for exclusions and omissions"
+                           Foreground="{StaticResource MutedTextBrush}"
+                           Margin="0,4,0,0"/>
+
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="NewSessionButton" Style="{StaticResource SecondaryButton}" Content="New Session" Margin="0,0,8,0" Width="96"/>
+                <Button x:Name="ImportButton" Style="{StaticResource SecondaryButton}" Content="Import" Margin="0,0,8,0" Width="70"/>
+                <Button x:Name="PreviewButton" Style="{StaticResource PrimaryButton}" Content="Preview &amp; Generate" Width="141"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+
+            <!-- Tab Content -->
+            <TabControl x:Name="MainTabControl" Grid.Row="1">
+                <TabControl.Resources>
+                    <Style TargetType="TabItem" BasedOn="{StaticResource PillTabItemStyle}"/>
+                </TabControl.Resources>
+                <!-- Main Tab -->
+                <TabItem x:Name="MainTab" Header="Main">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,-10,0">
+                        <!-- Main Tab -->
+                        <Grid x:Name="MainTabContent" Visibility="Visible">
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Organization Information" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+                                    <!-- Organization -->
+                                    <StackPanel Margin="0,0,0,16">
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                            <TextBlock Text="Organization" FontWeight="Medium"/>
+                                            <TextBlock Text="*" Foreground="Red" FontWeight="Bold"/>
+                                        </StackPanel>
+                                        <TextBox x:Name="OrganizationTextBox" Text="example.onmicrosoft.com"/>
+                                        <TextBlock Text="Required. Must be in format: name.onmicrosoft.com or name.onmicrosoft.us" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,0,0"/>
+                                    </StackPanel>
+
+                                    <!-- Organization Name -->
+                                    <StackPanel Margin="0,0,0,16">
+                                        <TextBlock Text="Organization Name"  FontWeight="Medium"  Margin="0,0,0,4"/>
+                                        <TextBox x:Name="OrgNameTextBox" Text="Your organization name"/>
+                                    </StackPanel>
+
+                                    <!-- Organization Unit Name -->
+                                    <StackPanel Margin="0,0,0,16">
+                                        <TextBlock Text="Organization Unit Name" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="OrgUnitTextBox" Text="Your organization unit name"/>
+                                    </StackPanel>
+
+                                    <!-- Description -->
+                                    <StackPanel Margin="0,0,0,16">
+                                        <TextBlock Text="Description" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <TextBox x:Name="DescriptionTextBox" Text="Organization description or purpose of this configuration" Height="66" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8"/>
+                                    </StackPanel>
+
+                                    <!-- M365 Environment -->
+                                    <StackPanel Margin="0,0,0,16">
+                                        <TextBlock Text="M365 Environment" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <ComboBox x:Name="EnvironmentComboBox" Width="380" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+
+                                    <!-- Products -->
+                                    <StackPanel Margin="0,0,0,16">
+                                        <TextBlock Text="Products"
+                                               FontWeight="Medium"
+                                               Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <Button x:Name="SelectAllButton"
+                                                Style="{StaticResource SecondaryButton}"
+                                                Content="Select All"
+                                                Width="100"
+                                                HorizontalAlignment="Left"/>
+                                            <TextBlock x:Name="WildcardText"
+                                                   Text="Will generate as ProductNames: ['*']"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12,0,0,0"
+                                                   Visibility="Collapsed"/>
+                                        </StackPanel>
+
+                                        <Grid x:Name="ProductsGrid">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+
+                                        </Grid>
+                                    </StackPanel>
+
+                                    <!-- Products Supporting Exclusions -->
+                                    <StackPanel Margin="0,0,0,0">
+                                        <TextBlock Text="Products Supporting Exclusions" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="ExclusionsInfoTextBlock" Foreground="{StaticResource MutedTextBrush}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- NEW: Exclusions Tab -->
+                <TabItem x:Name="ExclusionsTab" Header="Exclusions">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Information -->
+                        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Policy Exclusions"
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Foreground="{StaticResource PrimaryBrush}"
+                                        Margin="0,0,0,8"/>
+                                <TextBlock Text="Configure exclusions for specific policies. Exclusions allow you to customize policy behavior by excluding specific users, groups, domains, or other entities from policy evaluation. Products must be selected on the main page before configuring exclusions."
+                                        TextWrapping="Wrap"
+                                        Foreground="{StaticResource MutedTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Nested Tab Control for Products -->
+                        <TabControl x:Name="ExclusionProductTabControl" Grid.Row="1">
+                            <TabControl.Resources>
+                                <Style TargetType="TabItem">
+                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                    <Setter Property="FontWeight" Value="Medium"/>
+                                    <Setter Property="Padding" Value="12,6"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TabItem">
+                                                <Border x:Name="Bd"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="0,0,0,2"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter x:Name="ContentSite"
+                                                                    VerticalAlignment="Center"
+                                                                    HorizontalAlignment="Center"
+                                                                    ContentSource="Header"
+                                                                    Margin="0,0,0,0"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="Panel.ZIndex" Value="100"/>
+                                                        <Setter TargetName="Bd" Property="Background" Value="White"/>
+                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </TabControl.Resources>
+
+                            <!-- AAD Exclusions Tab -->
+                            <TabItem x:Name="AadExclusionTab" Header="AAD" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="AadExclusionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- Defender Exclusions Tab -->
+                            <TabItem x:Name="DefenderExclusionTab" Header="DEFENDER" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="DefenderExclusionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- EXO Exclusions Tab -->
+                            <TabItem x:Name="ExoExclusionTab" Header="EXO" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="ExoExclusionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- PowerPlatform Exclusions Tab -->
+                            <TabItem x:Name="PowerPlatformExclusionTab" Header="POWERPLATFORM" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="PowerPlatformExclusionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- SharePoint Exclusions Tab -->
+                            <TabItem x:Name="SharePointExclusionTab" Header="SHAREPOINT" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="SharePointExclusionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- Teams Exclusions Tab -->
+                            <TabItem x:Name="TeamsExclusionTab" Header="TEAMS" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="TeamsExclusionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                </TabItem>
+
+                <!-- Omit Policy Tab -->
+                <TabItem x:Name="OmitPolicyTab" Header="Omit Policy">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Information -->
+                        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Policy Omissions"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource PrimaryBrush}"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Text="Select policies to omit from the assessment and provide justification. Products must be selected on the main page before configuring omissions."
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource MutedTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Nested Tab Control for Products -->
+                        <TabControl x:Name="OmissionProductTabControl" Grid.Row="1">
+                            <TabControl.Resources>
+                                <Style TargetType="TabItem">
+                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                    <Setter Property="FontWeight" Value="Medium"/>
+                                    <Setter Property="Padding" Value="12,6"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TabItem">
+                                                <Border x:Name="Bd"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="0,0,0,2"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter x:Name="ContentSite"
+                                                                    VerticalAlignment="Center"
+                                                                    HorizontalAlignment="Center"
+                                                                    ContentSource="Header"
+                                                                    Margin="0,0,0,0"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="Panel.ZIndex" Value="100"/>
+                                                        <Setter TargetName="Bd" Property="Background" Value="White"/>
+                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </TabControl.Resources>
+
+                            <!-- AAD Omissions Tab -->
+                            <TabItem x:Name="AadOmissionTab" Header="AAD" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="AadOmissionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- Defender Omissions Tab -->
+                            <TabItem x:Name="DefenderOmissionTab" Header="DEFENDER" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="DefenderOmissionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- EXO Omissions Tab -->
+                            <TabItem x:Name="ExoOmissionTab" Header="EXO" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="ExoOmissionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- PowerPlatform Omissions Tab -->
+                            <TabItem x:Name="PowerPlatformOmissionTab" Header="POWERPLATFORM" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="PowerPlatformOmissionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- SharePoint Omissions Tab -->
+                            <TabItem x:Name="SharePointOmissionTab" Header="SHAREPOINT" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="SharePointOmissionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- Teams Omissions Tab -->
+                            <TabItem x:Name="TeamsOmissionTab" Header="TEAMS" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="TeamsOmissionContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                </TabItem>
+
+                <!-- Advanced Tab -->
+                <TabItem x:Name="AdvancedTab" Header="Advanced">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <Grid x:Name="AdvancedTabContent">
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Advanced Configuration" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+                                    <!-- Application Section -->
+                                    <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                <CheckBox x:Name="ApplicationSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="Application Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="ApplicationSectionContent" Visibility="Collapsed">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="AppID:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="AppIdTextBox" Width="300"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                <TextBlock Text="Certificate:" Width="120" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="CertificateTextBox" Width="220"/>
+                                                <Button x:Name="SelectCertificateButton" Content="Select..." Style="{StaticResource SecondaryButton}"
+                                                        Width="70" Height="24" Margin="8,0,0,0"/>
+                                            </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Output Section -->
+                                    <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                <CheckBox x:Name="OutputSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="Output Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="OutputSectionContent" Visibility="Collapsed">
+                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="Output Path:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutPathTextBox" Width="220" Text="."/>
+                                                    <Button x:Name="BrowseOutPathButton" Content="Browse..." Style="{StaticResource SecondaryButton}"
+                                                            Width="70" Height="24" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="Folder Name:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutFolderNameTextBox" Width="300" Text="M365BaselineConformance"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="JSON File:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutJsonFileNameTextBox" Width="300" Text="ScubaResults"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="CSV File:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutCsvFileNameTextBox" Width="300" Text="ScubaResults"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- OPA Section -->
+                                    <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                <CheckBox x:Name="OpaSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="OPA Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="OpaSectionContent" Visibility="Collapsed">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                <TextBlock Text="OPA Path:" Width="120" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="OpaPathTextBox" Width="220" Text="."/>
+                                                <Button x:Name="BrowseOpaPathButton" Content="Browse..." Style="{StaticResource SecondaryButton}"
+                                                        Width="70" Height="24" Margin="8,0,0,0"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- General Settings -->
+                                    <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                                <CheckBox x:Name="GeneralSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <TextBlock Text="General Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel x:Name="GeneralSectionContent" Visibility="Collapsed">
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <CheckBox x:Name="LogInCheckBox" Content="Login Required" IsChecked="True"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <CheckBox x:Name="DisconnectOnExitCheckBox" Content="Disconnect on Exit"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Preview Tab -->
+                <TabItem x:Name="PreviewTab" Header="Preview">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <!-- Preview Tab Content (Hidden by default) -->
+                        <Grid x:Name="PreviewTabContent">
+                            <Border Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="YAML Preview"
+                                           FontSize="18"
+                                           FontWeight="SemiBold"
+                                           Margin="0,0,0,16"/>
+
+                                    <TextBox x:Name="YamlPreviewTextBox"
+                                         Height="507"
+                                         FontFamily="Consolas, Courier New, monospace"
+                                         FontSize="14"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         IsReadOnly="True"
+                                         Background="#F8F9FA"
+                                         Padding="16"
+                                         VerticalContentAlignment="Top"/>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                                        <Button x:Name="CopyYamlButton"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="Copy to Clipboard"
+                                            Margin="0,0,8,0" Width="116"/>
+                                        <Button x:Name="DownloadYamlButton"
+                                            Style="{StaticResource PrimaryButton}"
+                                            Content="Download YAML" Height="37" Width="104"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+        </Grid>
+
+        <!-- Footer -->
+        <StackPanel Grid.Row="2"
+                    Margin="0,16,0,0" >
+            <TextBlock HorizontalAlignment="Center" TextAlignment="Center">
+                <Run Text="ScubaGear Configuration Editor" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}"/>
+                <Run Text=" | "/>
+                <Run Text="Data is not saved" FontWeight="SemiBold"/>
+                <Run Text=" | "/>
+                <Hyperlink NavigateUri="https://github.com/cisagov/ScubaGear">
+                    GitHub Repository
+                </Hyperlink>
+            </TextBlock>
+        </StackPanel>
+    </Grid>
+</Window>

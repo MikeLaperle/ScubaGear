@@ -1,0 +1,675 @@
+{
+  "products": [
+    {
+      "id": "aad",
+      "name": "Microsoft Entra ID",
+      "displayName": "Microsoft Entra ID (aad)",
+      "supportsExclusions": true
+    },
+    {
+      "id": "defender",
+      "name": "Defender",
+      "displayName": "Defender (defender)",
+      "supportsExclusions": true
+    },
+    {
+      "id": "exo",
+      "name": "Exchange Online",
+      "displayName": "Exchange Online (exo)",
+      "supportsExclusions": true
+    },
+    {
+      "id": "powerplatform",
+      "name": "Power Platform",
+      "displayName": "Power Platform (powerplatform)",
+      "supportsExclusions": false
+    },
+    {
+      "id": "sharepoint",
+      "name": "SharePoint & OneDrive",
+      "displayName": "SharePoint & OneDrive (sharepoint)",
+      "supportsExclusions": false
+    },
+    {
+      "id": "teams",
+      "name": "Microsoft Teams",
+      "displayName": "Microsoft Teams (teams)",
+      "supportsExclusions": false
+    }
+  ],
+  "SupportedM365Environment": [
+    {
+      "id": "commercial",
+      "name": "Public",
+      "displayName": "Commercial",
+      "description": "Production environment for public tenants."
+    },
+    {
+      "id": "gcc",
+      "name": "GCC",
+      "displayName": "Government Community Cloud",
+      "description": "Production environment for government tenants."
+    },
+    {
+      "id": "gcch",
+      "name": "GCCH",
+      "displayName": "Government Community Cloud High",
+      "description": "Production environment for GCCH tenants."
+    },
+    {
+      "id": "dod",
+      "name": "DOD",
+      "displayName": "Department of Defense",
+      "description": "Production environment for DOD tenants."
+    }
+  ],
+  "baselines": {
+    "aad": [
+      {
+        "id": "MS.AAD.1.1v1",
+        "name": "Legacy authentication SHALL be blocked.",
+        "exclusionType": "cap",
+        "description": "Legacy authentication SHALL be blocked."
+      },
+      {
+        "id": "MS.AAD.2.1v1",
+        "name": "Conditional access policies SHALL be enforced for all users.",
+        "exclusionType": "cap",
+        "description": "Conditional access policies SHALL be enforced for all users."
+      },
+      {
+        "id": "MS.AAD.2.3v1",
+        "name": "Multi-factor authentication SHALL be required for all users.",
+        "exclusionType": "cap",
+        "description": "Multi-factor authentication SHALL be required for all users."
+      },
+      {
+        "id": "MS.AAD.3.1v1",
+        "name": "MFA registration SHALL be required for authentication.",
+        "exclusionType": "cap",
+        "description": "MFA registration SHALL be required for authentication."
+      },
+      {
+        "id": "MS.AAD.3.2v1",
+        "name": "User risk-based conditional access SHALL be enforced.",
+        "exclusionType": "cap",
+        "description": "User risk-based conditional access SHALL be enforced."
+      },
+      {
+        "id": "MS.AAD.3.3v1",
+        "name": "Terms of use acceptance SHALL be required.",
+        "exclusionType": "none",
+        "description": "Terms of use acceptance SHALL be required."
+      },
+      {
+        "id": "MS.AAD.3.4v1",
+        "name": "Privileged account sign-in restrictions SHALL be configured.",
+        "exclusionType": "none",
+        "description": "Privileged account sign-in restrictions SHALL be configured."
+      },
+      {
+        "id": "MS.AAD.3.5v1",
+        "name": "Tenant restrictions SHALL be used to restrict access to authorized cloud services.",
+        "exclusionType": "none",
+        "description": "Tenant restrictions SHALL be used to restrict access to authorized cloud services."
+      },
+      {
+        "id": "MS.AAD.3.6v1",
+        "name": "Sign-in risk-based conditional access SHALL be enforced.",
+        "exclusionType": "cap",
+        "description": "Sign-in risk-based conditional access SHALL be enforced."
+      },
+      {
+        "id": "MS.AAD.3.7v1",
+        "name": "Device compliance SHALL be enforced for all users.",
+        "exclusionType": "cap",
+        "description": "Device compliance SHALL be enforced for all users."
+      },
+      {
+        "id": "MS.AAD.3.8v1",
+        "name": "Trusted locations SHALL be defined and used in conditional access policies.",
+        "exclusionType": "cap",
+        "description": "Trusted locations SHALL be defined and used in conditional access policies."
+      },
+      {
+        "id": "MS.AAD.3.9v1",
+        "name": "Device code authentication SHOULD be blocked.",
+        "exclusionType": "cap",
+        "description": "Device code authentication SHOULD be blocked."
+      },
+      {
+        "id": "MS.AAD.4.1v1",
+        "name": "Application registrations SHALL be restricted.",
+        "exclusionType": "none",
+        "description": "Application registrations SHALL be restricted."
+      },
+      {
+        "id": "MS.AAD.4.2v1",
+        "name": "Consent to applications accessing organization data SHALL be restricted.",
+        "exclusionType": "none",
+        "description": "Consent to applications accessing organization data SHALL be restricted."
+      },
+      {
+        "id": "MS.AAD.5.1v1",
+        "name": "External collaboration SHALL be restricted.",
+        "exclusionType": "none",
+        "description": "External collaboration SHALL be restricted."
+      },
+      {
+        "id": "MS.AAD.5.2v1",
+        "name": "Guest user access SHALL be restricted.",
+        "exclusionType": "none",
+        "description": "Guest user access SHALL be restricted."
+      },
+      {
+        "id": "MS.AAD.5.3v1",
+        "name": "Domain services SHALL be locked down.",
+        "exclusionType": "none",
+        "description": "Domain services SHALL be locked down."
+      },
+      {
+        "id": "MS.AAD.6.1v1",
+        "name": "Security defaults SHALL be disabled.",
+        "exclusionType": "none",
+        "description": "Security defaults SHALL be disabled."
+      },
+      {
+        "id": "MS.AAD.6.2v1",
+        "name": "Password protection SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Password protection SHALL be enabled."
+      },
+      {
+        "id": "MS.AAD.6.3v1",
+        "name": "Self-service password reset SHALL be enforced.",
+        "exclusionType": "none",
+        "description": "Self-service password reset SHALL be enforced."
+      },
+      {
+        "id": "MS.AAD.7.1v1",
+        "name": "Administrator account security SHALL be managed.",
+        "exclusionType": "none",
+        "description": "Administrator account security SHALL be managed."
+      },
+      {
+        "id": "MS.AAD.7.2v1",
+        "name": "Access reviews SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Access reviews SHALL be enabled."
+      },
+      {
+        "id": "MS.AAD.7.3v1",
+        "name": "Privileged Identity Management SHALL be used.",
+        "exclusionType": "none",
+        "description": "Privileged Identity Management SHALL be used."
+      },
+      {
+        "id": "MS.AAD.7.4v1",
+        "name": "Privileged roles SHALL have appropriate access controls.",
+        "exclusionType": "role",
+        "description": "Privileged roles SHALL have appropriate access controls."
+      },
+      {
+        "id": "MS.AAD.7.5v1",
+        "name": "Emergency accounts SHALL be managed.",
+        "exclusionType": "none",
+        "description": "Emergency accounts SHALL be managed."
+      },
+      {
+        "id": "MS.AAD.7.6v1",
+        "name": "User monitoring SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "User monitoring SHALL be enabled."
+      },
+      {
+        "id": "MS.AAD.8.1v1",
+        "name": "Authentication sessions SHALL be managed.",
+        "exclusionType": "none",
+        "description": "Authentication sessions SHALL be managed."
+      }
+    ],
+    "exo": [
+      {
+        "id": "MS.EXO.1.1v1",
+        "name": "Automatic forwarding to external domains SHALL be disabled.",
+        "exclusionType": "none",
+        "description": "Automatic forwarding to external domains SHALL be disabled."
+      },
+      {
+        "id": "MS.EXO.1.1v2",
+        "name": "Automatic forwarding to external domains SHALL be disabled except for allowed domains.",
+        "exclusionType": "forwardingDomains",
+        "description": "Automatic forwarding to external domains SHALL be disabled except for allowed domains."
+      },
+      {
+        "id": "MS.EXO.1.2v1",
+        "name": "Client auto-forwarding rules SHALL be blocked.",
+        "exclusionType": "none",
+        "description": "Client auto-forwarding rules SHALL be blocked."
+      },
+      {
+        "id": "MS.EXO.2.1v1",
+        "name": "Anti-spam policies SHALL be enforced.",
+        "exclusionType": "none",
+        "description": "Anti-spam policies SHALL be enforced."
+      },
+      {
+        "id": "MS.EXO.2.2v2",
+        "name": "An SPF policy SHALL be published for each domain that fails all non-approved senders.",
+        "exclusionType": "none",
+        "description": "An SPF policy SHALL be published for each domain that fails all non-approved senders."
+      },
+      {
+        "id": "MS.EXO.3.1v1",
+        "name": "Anti-phishing policies SHALL be enforced.",
+        "exclusionType": "none",
+        "description": "Anti-phishing policies SHALL be enforced."
+      },
+      {
+        "id": "MS.EXO.3.2v1",
+        "name": "Email authentication records SHALL be configured.",
+        "exclusionType": "none",
+        "description": "Email authentication records SHALL be configured."
+      },
+      {
+        "id": "MS.EXO.4.1v1",
+        "name": "Role management SHALL be restricted.",
+        "exclusionType": "none",
+        "description": "Role management SHALL be restricted."
+      },
+      {
+        "id": "MS.EXO.5.1v1",
+        "name": "Default sharing policy SHALL be restrictive.",
+        "exclusionType": "none",
+        "description": "Default sharing policy SHALL be restrictive."
+      },
+      {
+        "id": "MS.EXO.6.1v1",
+        "name": "Modern authentication SHALL be required.",
+        "exclusionType": "none",
+        "description": "Modern authentication SHALL be required."
+      }
+    ],
+    "defender": [
+      {
+        "id": "MS.DEFENDER.1.1v1",
+        "name": "Anti-malware SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Anti-malware SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.1.2v1",
+        "name": "Anti-malware policies for Microsoft Defender for Office 365 SHALL be configured.",
+        "exclusionType": "none",
+        "description": "Anti-malware policies for Microsoft Defender for Office 365 SHALL be configured."
+      },
+      {
+        "id": "MS.DEFENDER.1.3v1",
+        "name": "Anti-spam policies for Microsoft Defender for Office 365 SHALL be configured.",
+        "exclusionType": "none",
+        "description": "Anti-spam policies for Microsoft Defender for Office 365 SHALL be configured."
+      },
+      {
+        "id": "MS.DEFENDER.1.4v1",
+        "name": "Sensitive accounts SHALL be added to Exchange Online Protection in the strict preset security policy.",
+        "exclusionType": "sensitiveAccounts",
+        "description": "Sensitive accounts SHALL be added to Exchange Online Protection in the strict preset security policy."
+      },
+      {
+        "id": "MS.DEFENDER.1.5v1",
+        "name": "Sensitive accounts SHALL be added to Microsoft Defender for Office 365 preset security policy.",
+        "exclusionType": "sensitiveAccounts",
+        "description": "Sensitive accounts SHALL be added to Microsoft Defender for Office 365 preset security policy."
+      },
+      {
+        "id": "MS.DEFENDER.2.1v1",
+        "name": "User impersonation protection SHALL be enabled.",
+        "exclusionType": "sensitiveUsers",
+        "description": "User impersonation protection SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.2.2v1",
+        "name": "Domain impersonation protection SHALL be enabled.",
+        "exclusionType": "sensitiveAccounts",
+        "description": "Domain impersonation protection SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.2.3v1",
+        "name": "Partner domain protection SHALL be enabled.",
+        "exclusionType": "partnerDomains",
+        "description": "Partner domain protection SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.3.1v1",
+        "name": "Safe attachments SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Safe attachments SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.3.2v1",
+        "name": "Safe links SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Safe links SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.4.1v1",
+        "name": "Modern authentication for Exchange Online SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Modern authentication for Exchange Online SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.4.2v1",
+        "name": "User submissions policy SHALL be configured.",
+        "exclusionType": "none",
+        "description": "User submissions policy SHALL be configured."
+      },
+      {
+        "id": "MS.DEFENDER.5.1v1",
+        "name": "Advanced hunting in Microsoft 365 Defender SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Advanced hunting in Microsoft 365 Defender SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.5.2v1",
+        "name": "Alerts in Microsoft 365 Defender SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Alerts in Microsoft 365 Defender SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.5.3v1",
+        "name": "Email Alert Policies SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Email Alert Policies SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.6.1v1",
+        "name": "SEC Enhanced Licensing SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "SEC Enhanced Licensing SHALL be enabled."
+      },
+      {
+        "id": "MS.DEFENDER.6.2v1",
+        "name": "Microsoft Defender for Cloud Apps SHALL be enabled.",
+        "exclusionType": "none",
+        "description": "Microsoft Defender for Cloud Apps SHALL be enabled."
+      }
+    ],
+    "powerplatform": [
+      {
+        "id": "MS.POWERPLATFORM.1.1v1",
+        "name": "Data loss prevention (DLP) policies SHALL be established.",
+        "description": "Data loss prevention (DLP) policies SHALL be established."
+      },
+      {
+        "id": "MS.POWERPLATFORM.1.2v1",
+        "name": "Power Platform environment strategy SHALL be planned.",
+        "description": "Power Platform environment strategy SHALL be planned."
+      },
+      {
+        "id": "MS.POWERPLATFORM.2.1v1",
+        "name": "Creation of environments SHALL be restricted.",
+        "description": "Creation of environments SHALL be restricted."
+      },
+      {
+        "id": "MS.POWERPLATFORM.2.2v1",
+        "name": "Creation of databases SHALL be restricted.",
+        "description": "Creation of databases SHALL be restricted."
+      },
+      {
+        "id": "MS.POWERPLATFORM.3.1v1",
+        "name": "Locations for storing Power Platform resources SHALL be restricted.",
+        "description": "Locations for storing Power Platform resources SHALL be restricted."
+      },
+      {
+        "id": "MS.POWERPLATFORM.3.2v1",
+        "name": "Sender's IP address SHALL be added to allowed list.",
+        "description": "Sender's IP address SHALL be added to allowed list."
+      },
+      {
+        "id": "MS.POWERPLATFORM.4.1v1",
+        "name": "Resource creation SHALL be limited to approved connectors and templates.",
+        "description": "Resource creation SHALL be limited to approved connectors and templates."
+      },
+      {
+        "id": "MS.POWERPLATFORM.4.2v1",
+        "name": "Custom connector submission SHALL be disabled.",
+        "description": "Custom connector submission SHALL be disabled."
+      },
+      {
+        "id": "MS.POWERPLATFORM.4.3v1",
+        "name": "Sharing resources SHALL be blocked.",
+        "description": "Sharing resources SHALL be blocked."
+      },
+      {
+        "id": "MS.POWERPLATFORM.5.1v1",
+        "name": "Power Platform tenant isolation SHALL be configured.",
+        "description": "Power Platform tenant isolation SHALL be configured."
+      }
+    ],
+    "sharepoint": [
+      {
+        "id": "MS.SHAREPOINT.1.1v1",
+        "name": "External sharing SHALL be restricted.",
+        "description": "External sharing SHALL be restricted."
+      },
+      {
+        "id": "MS.SHAREPOINT.1.2v1",
+        "name": "Guest access SHALL be limited.",
+        "description": "Guest access SHALL be limited."
+      },
+      {
+        "id": "MS.SHAREPOINT.2.1v1",
+        "name": "Custom script SHALL be restricted.",
+        "description": "Custom script SHALL be restricted."
+      },
+      {
+        "id": "MS.SHAREPOINT.2.2v1",
+        "name": "OneDrive links SHALL be restricted.",
+        "description": "OneDrive links SHALL be restricted."
+      },
+      {
+        "id": "MS.SHAREPOINT.3.1v1",
+        "name": "Unauthenticated API access SHALL be blocked.",
+        "description": "Unauthenticated API access SHALL be blocked."
+      },
+      {
+        "id": "MS.SHAREPOINT.3.2v1",
+        "name": "Default link settings SHALL be restricted.",
+        "description": "Default link settings SHALL be restricted."
+      },
+      {
+        "id": "MS.SHAREPOINT.4.1v1",
+        "name": "Legacy authentication SHALL be blocked.",
+        "description": "Legacy authentication SHALL be blocked."
+      },
+      {
+        "id": "MS.SHAREPOINT.5.1v1",
+        "name": "Access control SHALL be restricted.",
+        "description": "Access control SHALL be restricted."
+      },
+      {
+        "id": "MS.SHAREPOINT.6.1v1",
+        "name": "File information SHALL be protected.",
+        "description": "File information SHALL be protected."
+      },
+      {
+        "id": "MS.SHAREPOINT.6.2v1",
+        "name": "Office 365 data SHALL be protected.",
+        "description": "Office 365 data SHALL be protected."
+      },
+      {
+        "id": "MS.SHAREPOINT.7.1v1",
+        "name": "User permissions SHALL be restricted.",
+        "description": "User permissions SHALL be restricted."
+      },
+      {
+        "id": "MS.SHAREPOINT.8.1v1",
+        "name": "Modern authentication SHALL be required.",
+        "description": "Modern authentication SHALL be required."
+      }
+    ],
+    "teams": [
+      {
+        "id": "MS.TEAMS.1.1v1",
+        "name": "External access SHALL be configured.",
+        "description": "External access SHALL be configured."
+      },
+      {
+        "id": "MS.TEAMS.1.2v1",
+        "name": "External domains SHALL be blocked.",
+        "description": "External domains SHALL be blocked."
+      },
+      {
+        "id": "MS.TEAMS.2.1v1",
+        "name": "Guest access SHALL be configured.",
+        "description": "Guest access SHALL be configured."
+      },
+      {
+        "id": "MS.TEAMS.2.2v1",
+        "name": "Anonymous users SHALL be blocked.",
+        "description": "Anonymous users SHALL be blocked."
+      },
+      {
+        "id": "MS.TEAMS.3.1v1",
+        "name": "Meeting policies SHALL be configured.",
+        "description": "Meeting policies SHALL be configured."
+      },
+      {
+        "id": "MS.TEAMS.3.2v1",
+        "name": "Dial-in access SHALL be restricted.",
+        "description": "Dial-in access SHALL be restricted."
+      },
+      {
+        "id": "MS.TEAMS.3.3v1",
+        "name": "External meeting participants SHALL be restricted.",
+        "description": "External meeting participants SHALL be restricted."
+      },
+      {
+        "id": "MS.TEAMS.4.1v1",
+        "name": "Information barriers SHALL be configured.",
+        "description": "Information barriers SHALL be configured."
+      },
+      {
+        "id": "MS.TEAMS.4.2v1",
+        "name": "Retention policies SHALL be configured.",
+        "description": "Retention policies SHALL be configured."
+      }
+    ]
+  },
+  "exclusionTypes": {
+    "cap": {
+      "name": "CapExclusions",
+      "description": "Exclude specific groups or users from conditional access policies",
+      "fields": [
+        {
+          "type": "array",
+          "name": "Groups",
+          "description": "Group IDs to exclude from this policy",
+          "valueType": "guid"
+        },
+        {
+          "type": "array",
+          "name": "Users",
+          "description": "User IDs to exclude from this policy",
+          "valueType": "guid"
+        }
+      ]
+    },
+    "role": {
+      "name": "RoleExclusions",
+      "description": "Exclude specific groups or users from role requirements",
+      "fields": [
+        {
+          "type": "array",
+          "name": "Groups",
+          "description": "Group IDs to exclude from this policy",
+          "valueType": "guid"
+        },
+        {
+          "type": "array",
+          "name": "Users",
+          "description": "User IDs to exclude from this policy",
+          "valueType": "guid"
+        }
+      ]
+    },
+    "sensitiveAccounts": {
+      "name": "SensitiveAccounts",
+      "description": "Configure sensitive account settings",
+      "fields": [
+        {
+          "type": "array",
+          "name": "IncludedUsers",
+          "description": "Users to include as sensitive accounts",
+          "valueType": "email"
+        },
+        {
+          "type": "array",
+          "name": "IncludedGroups",
+          "description": "Groups to include as sensitive accounts",
+          "valueType": "string"
+        },
+        {
+          "type": "array",
+          "name": "IncludedDomains",
+          "description": "Domains to include as sensitive accounts",
+          "valueType": "domain"
+        },
+        {
+          "type": "array",
+          "name": "ExcludedUsers",
+          "description": "Users to exclude from sensitive accounts",
+          "valueType": "email"
+        },
+        {
+          "type": "array",
+          "name": "ExcludedGroups",
+          "description": "Groups to exclude from sensitive accounts",
+          "valueType": "guid"
+        },
+        {
+          "type": "array",
+          "name": "ExcludedDomains",
+          "description": "Domains to exclude from sensitive accounts",
+          "valueType": "domain"
+        }
+      ]
+    },
+    "sensitiveUsers": {
+      "name": "SensitiveUsers",
+      "description": "Semicolon-separated list of sensitive users",
+      "fields": [
+        {
+          "type": "string",
+          "name": "SensitiveUsers",
+          "description": "Semicolon-separated list of sensitive users",
+          "valueType": "semicolonList"
+        }
+      ]
+    },
+    "partnerDomains": {
+      "name": "PartnerDomains",
+      "description": "List of partner domains",
+      "fields": [
+        {
+          "type": "array",
+          "name": "PartnerDomains",
+          "description": "List of partner domain names",
+          "valueType": "domain"
+        }
+      ]
+    },
+    "forwardingDomains": {
+      "name": "AllowedForwardingDomains",
+      "description": "Domains allowed for automatic email forwarding",
+      "fields": [
+        {
+          "type": "array",
+          "name": "AllowedForwardingDomains",
+          "description": "List of domains allowed for automatic email forwarding",
+          "valueType": "domain"
+        }
+      ]
+    }
+  }
+}
