@@ -231,17 +231,46 @@ Function Invoke-SCuBAConfigAppUI {
 
         [switch]$Online,
 
+        [ValidateSet('commercial', 'dod', 'gcc', 'gcchigh')]
+        [string]$M365Environment,
+
         [switch]$Passthru
     )
 
     [string]${CmdletName} = $MyInvocation.MyCommand
     Write-Verbose ("{0}: Sequencer started" -f ${CmdletName})
 
+    switch($M365Environment){
+        'commercial' {
+            $GraphEndpoint = "https://graph.microsoft.com"
+            $graphEnvironment = "Global"
+        }
+        'gcc' {
+            $GraphEndpoint = "https://graph.microsoft.com"
+            $graphEnvironment = "Global"
+        }
+        'gcchigh' {
+            # Set GCC High environment variables
+            $GraphEndpoint = "https://graph.microsoft.us"
+            $graphEnvironment = "UsGov"
+        }
+        'dod' {
+            # Set DoD environment variables
+            $GraphEndpoint = "https://dod-graph.microsoft.us"
+            $graphEnvironment = "UsGovDoD"
+        }
+        default {
+            $GraphEndpoint = "https://graph.microsoft.com"
+            $graphEnvironment = "Global"
+        }
+
+    }
+
     # Connect to Microsoft Graph if Online parameter is used
     if ($Online) {
         try {
             Write-Host "Connecting to Microsoft Graph..." -ForegroundColor Green
-            Connect-MgGraph -Scopes "User.Read.All", "Group.Read.All", "Policy.Read.All" -NoWelcome
+            Connect-MgGraph -Scopes "User.Read.All", "Group.Read.All", "Policy.Read.All", "Organization.Read.All" -NoWelcome -Environment $graphEnvironment -ErrorAction Stop | Out-Null
             $Online = $true
             Write-Host "Successfully connected to Microsoft Graph" -ForegroundColor Green
         }
@@ -261,6 +290,8 @@ Function Invoke-SCuBAConfigAppUI {
     $syncHash.XamlPath = "$PSScriptRoot\ScubaConfigAppUI.xaml"
     $syncHash.UIConfigPath = "$PSScriptRoot\ScubaConfig_$Language.json"
     $syncHash.YAMLImport = $YAMLConfig
+    $syncHash.GraphEndpoint = $GraphEndpoint
+    $syncHash.M365Environment = $M365Environment
     $syncHash.Exclusions = @()
     $syncHash.Omissions = @()
     $syncHash.ExportSettings = @{}
@@ -345,6 +376,14 @@ Function Invoke-SCuBAConfigAppUI {
         }
         # Set default selection
         $syncHash.EnvironmentComboBox.SelectedIndex = 0
+
+        If($syncHash.GraphConnected){
+            $selectedEnv = $syncHash.EnvironmentComboBox.Items | Where-Object { $_.Tag -eq $syncHash.M365Environment }
+            $syncHash.SelectedEnv = $syncHash.EnvironmentComboBox.Items
+            if ($selectedEnv) {
+                $syncHash.EnvironmentComboBox.SelectedItem = $selectedEnv
+            }
+        }
 
         <#populate each baseline items
         foreach ($baseline in $syncHash.UIConfigs.baselines.aad | Where-Object {$_.exclusionType -ne 'none'}) {
@@ -891,6 +930,12 @@ Function Invoke-SCuBAConfigAppUI {
                     $listPanel = $this.Parent.Parent.Children[1]
 
                     if (![string]::IsNullOrWhiteSpace($inputBox.Text) -and $inputBox.Text -ne $placeholder) {
+
+                        If($listContainer.Children.Children | Where-Object { $_.Text -contains $inputBox.Text }) {
+                            # User already exists, skip
+                            return
+                        }
+
                         # Validate input based on valueType
                         $isValid = $true
                         switch ($Field.valueType) {
@@ -986,26 +1031,32 @@ Function Invoke-SCuBAConfigAppUI {
                         try {
                             # Get search term from input box
                             $searchTerm = if ($inputTextBox.Text -ne $placeholder -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
-                            
+
                             # Show user selector
                             $selectedUsers = Show-UserSelector -SearchTerm $searchTerm
-                            
+
                             if ($selectedUsers -and $selectedUsers.Count -gt 0) {
                                 # Clear existing items
-                                $listContainer.Children.Clear()
-                                
+                                #$listContainer.Children.Clear()
+
+
                                 # Add selected users to the list
                                 foreach ($user in $selectedUsers) {
+                                    #check if group already exists in the list
+                                    If ($listContainer.Children.Children | Where-Object { $_.Text -contains $user.Id }) {
+                                        # User already exists, skip
+                                        return
+                                    }
                                     $userItem = New-Object System.Windows.Controls.StackPanel
                                     $userItem.Orientation = "Horizontal"
                                     $userItem.Margin = "0,2,0,2"
-                                    
+
                                     $userText = New-Object System.Windows.Controls.TextBlock
                                     $userText.Text = "$($user.id)"
-                                    $userText.Width = 350
+                                    $userText.Width = 250
                                     $userText.VerticalAlignment = "Center"
                                     $userText.ToolTip = "$($user.DisplayName) ($($user.UserPrincipalName))"
-                                    
+
                                     $removeUserButton = New-Object System.Windows.Controls.Button
                                     $removeUserButton.Content = "Remove"
                                     $removeUserButton.Width = 60
@@ -1021,24 +1072,25 @@ Function Invoke-SCuBAConfigAppUI {
                                         $parentContainer = $parentItem.Parent
                                         $parentContainer.Children.Remove($parentItem)
                                     }.GetNewClosure())
-                                    
+
                                     [void]$userItem.Children.Add($userText)
                                     [void]$userItem.Children.Add($removeUserButton)
                                     [void]$listContainer.Children.Add($userItem)
+
                                 }
-                                
+
                                 # Clear the input box
                                 $inputTextBox.Text = $placeholder
                                 $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
                                 $inputTextBox.FontStyle = "Italic"
-                                
+
                                 Write-Host "Added $($selectedUsers.Count) users to exclusion list" -ForegroundColor Green
                             }
                         }
                         catch {
                             Write-Error "Error selecting users: $($_.Exception.Message)"
-                            [System.Windows.MessageBox]::Show("Error selecting users: $($_.Exception.Message)", "Error", 
-                                                            [System.Windows.MessageBoxButton]::OK, 
+                            [System.Windows.MessageBox]::Show("Error selecting users: $($_.Exception.Message)", "Error",
+                                                            [System.Windows.MessageBoxButton]::OK,
                                                             [System.Windows.MessageBoxImage]::Error)
                         }
                     }.GetNewClosure())
@@ -1058,26 +1110,33 @@ Function Invoke-SCuBAConfigAppUI {
                         try {
                             # Get search term from input box
                             $searchTerm = if ($inputTextBox.Text -ne $placeholder -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
-                            
+
                             # Show group selector
                             $selectedGroups = Show-GroupSelector -SearchTerm $searchTerm
-                            
+
                             if ($selectedGroups -and $selectedGroups.Count -gt 0) {
                                 # Clear existing items
-                                $listContainer.Children.Clear()
-                                
+                                #$listContainer.Children.Clear()
+
                                 # Add selected groups to the list
-                                foreach ($group in $selectedGroups) {
+                                foreach ($group in $selectedGroups)
+                                {
+                                    #check if group already exists in the list
+                                    If ($listContainer.Children.Children | Where-Object { $_.Text -contains $group.Id }) {
+                                        # User already exists, skip
+                                        Return
+
+                                    }
                                     $groupItem = New-Object System.Windows.Controls.StackPanel
                                     $groupItem.Orientation = "Horizontal"
                                     $groupItem.Margin = "0,2,0,2"
-                                    
+
                                     $groupText = New-Object System.Windows.Controls.TextBlock
-                                    $groupText.Text = "$($group.Id))"
-                                    $groupText.Width = 350
+                                    $groupText.Text = "$($group.Id)"
+                                    $groupText.Width = 250
                                     $groupText.VerticalAlignment = "Center"
                                     $groupText.ToolTip = "$($group.DisplayName)"
-                                    
+
                                     $removeGroupButton = New-Object System.Windows.Controls.Button
                                     $removeGroupButton.Content = "Remove"
                                     $removeGroupButton.Width = 60
@@ -1087,30 +1146,32 @@ Function Invoke-SCuBAConfigAppUI {
                                     $removeGroupButton.Background = [System.Windows.Media.Brushes]::Red
                                     $removeGroupButton.Foreground = [System.Windows.Media.Brushes]::White
                                     $removeGroupButton.BorderThickness = "0"
-                                    
+
                                     $removeGroupButton.Add_Click({
                                         $parentItem = $this.Parent
                                         $parentContainer = $parentItem.Parent
                                         $parentContainer.Children.Remove($parentItem)
                                     }.GetNewClosure())
-                                    
+
                                     [void]$groupItem.Children.Add($groupText)
                                     [void]$groupItem.Children.Add($removeGroupButton)
                                     [void]$listContainer.Children.Add($groupItem)
+
+
                                 }
-                                
+
                                 # Clear the input box
                                 $inputTextBox.Text = $placeholder
                                 $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
                                 $inputTextBox.FontStyle = "Italic"
-                                
+
                                 Write-Host "Added $($selectedGroups.Count) groups to exclusion list" -ForegroundColor Green
                             }
                         }
                         catch {
                             Write-Error "Error selecting groups: $($_.Exception.Message)"
-                            [System.Windows.MessageBox]::Show("Error selecting groups: $($_.Exception.Message)", "Error", 
-                                                            [System.Windows.MessageBoxButton]::OK, 
+                            [System.Windows.MessageBox]::Show("Error selecting groups: $($_.Exception.Message)", "Error",
+                                                            [System.Windows.MessageBoxButton]::OK,
                                                             [System.Windows.MessageBoxImage]::Error)
                         }
                     }.GetNewClosure())
@@ -1450,7 +1511,7 @@ Function Invoke-SCuBAConfigAppUI {
         # GRAPH controls
         #
         #===========================================================================
-        
+
         # Enhanced Graph Query Function with Filter Support
         function Invoke-GraphQueryWithFilter {
             param(
@@ -1508,7 +1569,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                     # Combine query string
                     if ($queryStringParts.Count -gt 0) {
-                        $queryParams.Uri += "?" + ($queryStringParts -join "&")
+                        $queryParams.Uri += $syncHash.GraphEndpoint + "?" + ($queryStringParts -join "&")
                     }
 
                     Write-Host "Graph Query URI: $($queryParams.Uri)" -ForegroundColor Cyan
@@ -1549,11 +1610,20 @@ Function Invoke-SCuBAConfigAppUI {
         #===========================================================================
         # Placeholder Text Functionality
         #===========================================================================
-        # Organization Name TextBox with placeholder
-        $syncHash.OrganizationPlaceholder = "Enter tenant name (e.g., example.onmicrosoft.com)"
-        $syncHash.OrganizationTextBox.Text = $syncHash.OrganizationPlaceholder
-        $syncHash.OrganizationTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-        $syncHash.OrganizationTextBox.FontStyle = [System.Windows.FontStyles]::Italic
+        If($syncHash.GraphConnected) {
+            # Placeholder for Organization Name TextBox
+            $tenantDetails = (Invoke-MgGraphRequest -Method GET -Uri "$GraphEndpoint/v1.0/organization").Value
+            $tenantName = ($tenantDetails.VerifiedDomains | Where-Object { $_.IsDefault -eq $true }).Name
+            $syncHash.OrganizationTextBox.Text = $tenantName
+            $syncHash.OrganizationTextBox.Foreground = [System.Windows.Media.Brushes]::Black
+        }Else{
+            # Organization Name TextBox with placeholder
+            $syncHash.OrganizationPlaceholder = "Enter tenant name (e.g., example.onmicrosoft.com)"
+            $syncHash.OrganizationTextBox.Text = $syncHash.OrganizationPlaceholder
+            $syncHash.OrganizationTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+            $syncHash.OrganizationTextBox.FontStyle = [System.Windows.FontStyles]::Italic
+        }
+
 
         $syncHash.OrganizationTextBox.Add_GotFocus({
             if ($syncHash.OrganizationTextBox.Text -eq $syncHash.OrganizationPlaceholder) {
@@ -1720,7 +1790,7 @@ Function Invoke-SCuBAConfigAppUI {
         $syncHash.SelectCertificateButton.Add_Click({
             try {
                 Write-Host "Certificate selection started..." -ForegroundColor Yellow
-                
+
                 # Get user certificates
                 $userCerts = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where-Object {
                     $_.HasPrivateKey -and
@@ -1757,17 +1827,17 @@ Function Invoke-SCuBAConfigAppUI {
                     Thumbprint = @{ Header = "Thumbprint"; Width = 120 }
                 }
 
-            
+
                 # Show selector (single selection only for certificates)
                 $selectedCerts = Show-UniversalSelector -Title "Select Certificate" -SearchPlaceholder "Search by subject..." -Items $displayCerts -ColumnConfig $columnConfig -SearchProperty "Subject"
 
                 if ($selectedCerts -and $selectedCerts.Count -gt 0) {
                     # Get the first (and only) selected certificate
                     $selectedCert = $selectedCerts[0]
-                    
+
                     $syncHash.CertificateTextBox.Text = $selectedCert.Thumbprint
-                    
-                } 
+
+                }
             }
             catch {
 
@@ -1787,7 +1857,7 @@ Function Invoke-SCuBAConfigAppUI {
                 [string]$SearchTerm = "",
                 [int]$Top = 100
             )
-            
+
             try {
 
                 # Build filter string for UPN contains
@@ -1903,7 +1973,7 @@ Function Invoke-SCuBAConfigAppUI {
                 [string]$SearchTerm = "",
                 [int]$Top = 100
             )
-            
+
             try {
 
                 # Build filter string for group name contains
@@ -1974,7 +2044,7 @@ Function Invoke-SCuBAConfigAppUI {
                         $groupType = "Distribution"
                         if ($_.SecurityEnabled) { $groupType = "Security" }
                         if ($_.GroupTypes -contains "Unified") { $groupType = "Microsoft 365" }
-                        
+
                         [PSCustomObject]@{
                             DisplayName = $_.DisplayName
                             Description = $_.Description
@@ -2020,26 +2090,26 @@ Function Invoke-SCuBAConfigAppUI {
             param(
                 [Parameter(Mandatory)]
                 [string]$Title,
-                
+
                 [Parameter(Mandatory)]
                 [string]$SearchPlaceholder,
-                
+
                 [Parameter(Mandatory)]
                 [array]$Items,
-                
+
                 [Parameter(Mandatory)]
                 [hashtable]$ColumnConfig,
-                
+
                 [Parameter()]
                 [string]$SearchProperty = "DisplayName",
-                
+
                 [Parameter()]
                 [string]$ReturnProperty = "Id",
-                
+
                 [Parameter()]
                 [switch]$AllowMultiple
             )
-            
+
             try {
                 # Create selection window
                 $selectionWindow = New-Object System.Windows.Window
@@ -2132,7 +2202,7 @@ Function Invoke-SCuBAConfigAppUI {
                     if ([string]::IsNullOrWhiteSpace($searchText) -or $searchText -eq $SearchPlaceholder.ToLower()) {
                         $dataGrid.ItemsSource = $originalItems
                     } else {
-                        $filteredItems = $originalItems | Where-Object { 
+                        $filteredItems = $originalItems | Where-Object {
                             $_.$SearchProperty.ToLower().Contains($searchText)
                         }
                         $dataGrid.ItemsSource = $filteredItems
@@ -2759,7 +2829,6 @@ $description
                 Users: <-- FieldName
                     - a90c9846-7c79-4d90-a38a-6d4781106481 <-- FieldValue
             #>
-            # Add this where you have the exclusions comment in New-YamlPreview
             if ($syncHash.Exclusions.Count -gt 0) {
                 $yamlPreview += "`n`n# Policy Exclusions"
 
@@ -2782,21 +2851,43 @@ $description
                             # Get exclusion type definition
                             $exclusionTypeDef = $syncHash.UIConfigs.exclusionTypes.$($exclusion.TypeName)
                             if ($exclusionTypeDef) {
-                                $yamlPreview += "`n    $($exclusionTypeDef.name):"
+                                # Check if this exclusion type has only one field and if that field name matches the type name
+                                $fields = $exclusionTypeDef.fields
+                                $isSingleFieldSameName = ($fields.Count -eq 1) -and ($fields[0].name -eq $exclusionTypeDef.name)
 
-                                # Add each field from the exclusion data
-                                foreach ($fieldName in $exclusion.Data.Keys) {
+                                if ($isSingleFieldSameName) {
+                                    # Skip the extra nesting level - go directly to the field values
+                                    $fieldName = $fields[0].name
                                     $fieldValue = $exclusion.Data[$fieldName]
-                                    $yamlPreview += "`n      $($fieldName):"
+                                    $yamlPreview += "`n    $($fieldName):"
 
                                     if ($fieldValue -is [array]) {
                                         # Handle array values
                                         foreach ($value in $fieldValue) {
-                                            $yamlPreview += "`n        - $value"
+                                            $yamlPreview += "`n      - $value"
                                         }
                                     } else {
                                         # Handle single values
-                                        $yamlPreview += "`n        - $fieldValue"
+                                        $yamlPreview += "`n      - $fieldValue"
+                                    }
+                                } else {
+                                    # Multiple fields or field name doesn't match type name - use normal nesting
+                                    $yamlPreview += "`n    $($exclusionTypeDef.name):"
+
+                                    # Add each field from the exclusion data
+                                    foreach ($fieldName in $exclusion.Data.Keys) {
+                                        $fieldValue = $exclusion.Data[$fieldName]
+                                        $yamlPreview += "`n      $($fieldName):"
+
+                                        if ($fieldValue -is [array]) {
+                                            # Handle array values
+                                            foreach ($value in $fieldValue) {
+                                                $yamlPreview += "`n        - $value"
+                                            }
+                                        } else {
+                                            # Handle single values
+                                            $yamlPreview += "`n        - $fieldValue"
+                                        }
                                     }
                                 }
                             }
@@ -2805,7 +2896,7 @@ $description
                 }
             }
 
-            # list omisisons psobject
+            # list omissions psobject
             # members: Id,Product,Rationale,Expiration
             <#
             OmitPolicy: <-- OmitPolicy

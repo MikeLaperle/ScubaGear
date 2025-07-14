@@ -1971,7 +1971,7 @@
           "type": "array",
           "name": "ExcludedGroups",
           "description": "Groups to exclude from sensitive accounts",
-          "valueType": "guid"
+          "valueType": "string"
         },
         {
           "type": "array",
@@ -2021,7 +2021,7 @@
   "graphQueries": {
     "cap": {
       "name": "Conditional Access Policies",
-      "endpoint": "https://graph.microsoft.com/v1.0/identity/conditionalAccess/policies",
+      "endpoint": "/v1.0/identity/conditionalAccess/policies",
       "queryParameters": {
         "$select": "id,displayName,state,conditions",
         "$filter": "state eq 'enabled'",
@@ -2030,7 +2030,7 @@
     },
     "users": {
         "name": "Users",
-        "endpoint": "https://graph.microsoft.com/v1.0/users",
+        "endpoint": "/v1.0/users",
         "queryParameters": {
             "$select": "Id,DisplayName,UserPrincipalName,Mail,AccountEnabled,UserType,JobTitle,Department",
             "$top": 999
@@ -2038,7 +2038,7 @@
     },
     "groups": {
         "name": "Groups",
-        "endpoint": "https://graph.microsoft.com/v1.0/groups",
+        "endpoint": "/v1.0/groups",
         "queryParameters": {
             "$select": "Id,DisplayName,Description,Mail,GroupTypes,SecurityEnabled,MailEnabled",
             "$top": 999
