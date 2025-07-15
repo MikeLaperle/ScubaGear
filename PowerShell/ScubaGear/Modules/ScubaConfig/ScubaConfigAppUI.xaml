@@ -549,6 +549,128 @@
                     </Grid>
                 </TabItem>
 
+
+                <!-- Annotate Policy Tab -->
+                <TabItem x:Name="AnnotatePolicyTab" Header="Annotate Policy">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Information -->
+                        <Border Grid.Row="0" Style="{StaticResource Card}" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Policy Annotations"
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Foreground="{StaticResource PrimaryBrush}"
+                                        Margin="0,0,0,8"/>
+                                <TextBlock x:Name="AnnotationsTabInfoTextBlock" 
+                                        Text="Add comments and annotations to policies for documentation and tracking purposes. Products must be selected on the main page before configuring annotations."
+                                        TextWrapping="Wrap" 
+                                        Foreground="{StaticResource MutedTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Nested Tab Control for Products -->
+                        <TabControl x:Name="AnnotationProductTabControl" Grid.Row="1">
+                            <TabControl.Resources>
+                                <Style TargetType="TabItem">
+                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                                    <Setter Property="FontWeight" Value="Medium"/>
+                                    <Setter Property="Padding" Value="12,6"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="TabItem">
+                                                <Border x:Name="Bd"
+                                                        Background="{TemplateBinding Background}"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        BorderThickness="0,0,0,2"
+                                                        Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter x:Name="ContentSite"
+                                                                    VerticalAlignment="Center"
+                                                                    HorizontalAlignment="Center"
+                                                                    ContentSource="Header"
+                                                                    Margin="0,0,0,0"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="Panel.ZIndex" Value="100"/>
+                                                        <Setter TargetName="Bd" Property="Background" Value="White"/>
+                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </TabControl.Resources>
+
+                            <!-- AAD Annotations Tab -->
+                            <TabItem x:Name="AadAnnotationTab" Header="AAD" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="AadAnnotationContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- Defender Annotations Tab -->
+                            <TabItem x:Name="DefenderAnnotationTab" Header="DEFENDER" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="DefenderAnnotationContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- EXO Annotations Tab -->
+                            <TabItem x:Name="ExoAnnotationTab" Header="EXO" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="ExoAnnotationContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- PowerPlatform Annotations Tab -->
+                            <TabItem x:Name="PowerPlatformAnnotationTab" Header="POWERPLATFORM" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="PowerPlatformAnnotationContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- SharePoint Annotations Tab -->
+                            <TabItem x:Name="SharePointAnnotationTab" Header="SHAREPOINT" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="SharePointAnnotationContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+
+                            <!-- Teams Annotations Tab -->
+                            <TabItem x:Name="TeamsAnnotationTab" Header="TEAMS" IsEnabled="False">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                    <StackPanel x:Name="TeamsAnnotationContent">
+                                        <!-- Will be populated dynamically -->
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
+                        </TabControl>
+                    </Grid>
+                </TabItem>
+                
                 <!-- Omit Policy Tab -->
                 <TabItem x:Name="OmitPolicyTab" Header="Omit Policy">
                     <Grid>

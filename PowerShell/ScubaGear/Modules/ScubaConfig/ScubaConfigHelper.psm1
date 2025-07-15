@@ -1,4 +1,201 @@
-function Update-BaselineConfig {
+function Get-ScubaConfigRegoExclusionMappings {
+    <#
+    .SYNOPSIS
+    Parses Rego configuration files to extract the actual exclusion type mappings for each policy.
+
+    .DESCRIPTION
+    This function analyzes the Rego files in the ScubaGear project to determine which exclusion types
+    are actually used by each policy ID. This provides the most accurate mapping compared to text-based
+    pattern matching.
+
+    .PARAMETER RegoDirectory
+    The directory containing the Rego files. Defaults to the standard ScubaGear Rego directory.
+
+    .EXAMPLE
+    $mappings = Get-ScubaConfigRegoExclusionMappings -RegoDirectory "C:\Path\To\ScubaGear\Rego"
+    #>
+    param(
+        [Parameter(Mandatory=$false)]
+        [string]$RegoDirectory = "$PSScriptRoot\..\..\Rego"
+    )
+
+    $exclusionMappings = @{}
+    
+    # Define the mapping patterns to look for in Rego files
+    <#
+    $patterns = @{
+        # AAD Patterns
+        'UserExclusionsFullyExempt.*["\']([^"\']+)["\']' = 'capolicy'
+        'GroupExclusionsFullyExempt.*["\']([^"\']+)["\']' = 'capolicy'
+        'PrivilegedRoleExclusions.*["\']([^"\']+)["\']' = 'role'
+        
+        # Defender Patterns
+        'SensitiveAccountsConfig.*["\']([^"\']+)["\']' = 'sensitiveAccounts'
+        'SensitiveAccountsSetting.*["\']([^"\']+)["\']' = 'sensitiveAccounts'
+        'ImpersonationProtectionConfig.*["\']([^"\']+)["\'].*["\']AgencyDomains["\']' = 'agencyDomains'
+        'ImpersonationProtectionConfig.*["\']([^"\']+)["\'].*["\']PartnerDomains["\']' = 'partnerDomains'
+        'ImpersonationProtectionConfig.*["\']([^"\']+)["\'].*["\']SensitiveUsers["\']' = 'sensitiveUsers'
+        'ImpersonationProtectionConfig.*["\']([^"\']+)["\']' = 'sensitiveUsers'  # Default for impersonation
+        
+        # EXO Patterns
+        'input\.scuba_config\.Exo\[["\']([^"\']+)["\']\]\.AllowedForwardingDomains' = 'forwardingDomains'
+        
+        # General scuba_config patterns
+        'input\.scuba_config\.Aad\[["\']([^"\']+)["\']\]\.CapExclusions' = 'capolicy'
+        'input\.scuba_config\.Aad\[["\']([^"\']+)["\']\]\.RoleExclusions' = 'role'
+        'input\.scuba_config\.Defender\[["\']([^"\']+)["\']\]\.SensitiveAccounts' = 'sensitiveAccounts'
+        'input\.scuba_config\.Defender\[["\']([^"\']+)["\']\]\.SensitiveUsers' = 'sensitiveUsers'
+        'input\.scuba_config\.Defender\[["\']([^"\']+)["\']\]\.PartnerDomains' = 'partnerDomains'
+        'input\.scuba_config\.Defender\[["\']([^"\']+)["\']\]\.AgencyDomains' = 'agencyDomains'
+        'input\.scuba_config\.Exo\[["\']([^"\']+)["\']\]\.AllowedForwardingDomains' = 'forwardingDomains'
+    }#>
+
+    $patterns = @{
+        'UserExclusionsFullyExempt.*["'']([^"'']+)["'']' = 'capolicy'
+        'GroupExclusionsFullyExempt.*["'']([^"'']+)["'']' = 'capolicy'
+        'PrivilegedRoleExclusions.*["'']([^"'']+)["'']' = 'role'
+        
+        'SensitiveAccountsConfig.*["'']([^"'']+)["'']' = 'sensitiveAccounts'
+        'SensitiveAccountsSetting.*["'']([^"'']+)["'']' = 'sensitiveAccounts'
+        'ImpersonationProtectionConfig.*["'']([^"'']+)["''].*["'']AgencyDomains["'']' = 'agencyDomains'
+        'ImpersonationProtectionConfig.*["'']([^"'']+)["''].*["'']PartnerDomains["'']' = 'partnerDomains'
+        'ImpersonationProtectionConfig.*["'']([^"'']+)["''].*["'']SensitiveUsers["'']' = 'sensitiveUsers'
+        'ImpersonationProtectionConfig.*["'']([^"'']+)["'']' = 'sensitiveUsers'
+
+        'input\.scuba_config\.Exo\[\''([^'']+)\''\]\.AllowedForwardingDomains' = 'forwardingDomains'
+        
+        'input\.scuba_config\.Aad\[\''([^'']+)\''\]\.CapExclusions' = 'capolicy'
+        'input\.scuba_config\.Aad\[\''([^'']+)\''\]\.RoleExclusions' = 'role'
+        'input\.scuba_config\.Defender\[\''([^'']+)\''\]\.SensitiveAccounts' = 'sensitiveAccounts'
+        'input\.scuba_config\.Defender\[\''([^'']+)\''\]\.SensitiveUsers' = 'sensitiveUsers'
+        'input\.scuba_config\.Defender\[\''([^'']+)\''\]\.PartnerDomains' = 'partnerDomains'
+        'input\.scuba_config\.Defender\[\''([^'']+)\''\]\.AgencyDomains' = 'agencyDomains'
+    }
+
+
+    # Get all Rego files
+    $regoFiles = Get-ChildItem -Path $RegoDirectory -Filter "*.rego" -Recurse
+
+    foreach ($file in $regoFiles) {
+        $content = Get-Content -Path $file.FullName -Raw
+        
+        # Extract product from filename
+        $product = $file.BaseName.Replace('Config', '').ToLower()
+        
+        foreach ($pattern in $patterns.Keys) {
+            $exclusionType = $patterns[$pattern]
+            
+            # Use regex to find matches
+            $matches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            
+            foreach ($match in $matches) {
+                if ($match.Groups.Count -gt 1) {
+                    $policyId = $match.Groups[1].Value
+                    
+                    # Only add if it looks like a valid policy ID
+                    if ($policyId -match '^MS\.[A-Z]+\.[0-9]+\.[0-9]+v[0-9]+$') {
+                        $exclusionMappings[$policyId] = $exclusionType
+                        Write-Verbose "Found mapping: $policyId -> $exclusionType (from $($file.Name))"
+                    }
+                }
+            }
+        }
+    }
+
+    # Add some additional patterns by analyzing comments and function names
+    foreach ($file in $regoFiles) {
+        $content = Get-Content -Path $file.FullName
+        
+        $currentPolicyId = $null
+        $inPolicySection = $false
+        
+        for ($i = 0; $i -lt $content.Count; $i++) {
+            $line = $content[$i]
+            
+            # Look for policy ID comments
+            if ($line -match '#\s*(MS\.[A-Z]+\.[0-9]+\.[0-9]+v[0-9]+)') {
+                $currentPolicyId = $matches[1]
+                $inPolicySection = $true
+                continue
+            }
+            
+            # Look for end of policy section
+            if ($inPolicySection -and $line -match '^#\s*MS\.[A-Z]+\.[0-9]+' -and $line -notmatch $currentPolicyId) {
+                $inPolicySection = $false
+                $currentPolicyId = $null
+                continue
+            }
+            
+            # If we're in a policy section, look for specific patterns
+            if ($inPolicySection -and $currentPolicyId) {
+                # Look for specific exclusion patterns within the policy section
+                switch -Regex ($line) {
+                    'UserExclusionsFullyExempt|GroupExclusionsFullyExempt' { 
+                        $exclusionMappings[$currentPolicyId] = 'capolicy'
+                        Write-Verbose "Found CAP mapping: $currentPolicyId -> capolicy (from context)"
+                    }
+                    'PrivilegedRoleExclusions' { 
+                        $exclusionMappings[$currentPolicyId] = 'role'
+                        Write-Verbose "Found role mapping: $currentPolicyId -> role (from context)"
+                    }
+                    'SensitiveAccountsConfig|SensitiveAccountsSetting' { 
+                        $exclusionMappings[$currentPolicyId] = 'sensitiveAccounts'
+                        Write-Verbose "Found sensitive accounts mapping: $currentPolicyId -> sensitiveAccounts (from context)"
+                    }
+                    'ImpersonationProtectionConfig.*SensitiveUsers' { 
+                        $exclusionMappings[$currentPolicyId] = 'sensitiveUsers'
+                        Write-Verbose "Found sensitive users mapping: $currentPolicyId -> sensitiveUsers (from context)"
+                    }
+                    'ImpersonationProtectionConfig.*PartnerDomains' { 
+                        $exclusionMappings[$currentPolicyId] = 'partnerDomains'
+                        Write-Verbose "Found partner domains mapping: $currentPolicyId -> partnerDomains (from context)"
+                    }
+                    'ImpersonationProtectionConfig.*AgencyDomains' { 
+                        $exclusionMappings[$currentPolicyId] = 'agencyDomains'
+                        Write-Verbose "Found agency domains mapping: $currentPolicyId -> agencyDomains (from context)"
+                    }
+                    'AllowedForwardingDomains' { 
+                        $exclusionMappings[$currentPolicyId] = 'forwardingDomains'
+                        Write-Verbose "Found forwarding domains mapping: $currentPolicyId -> forwardingDomains (from context)"
+                    }
+                }
+            }
+        }
+    }
+
+    return $exclusionMappings
+}
+
+function Update-ScubaConfigBaselineWithRego {
+    <#
+    .SYNOPSIS
+    Updates the baseline configuration using exclusion mappings extracted from Rego files.
+
+    .DESCRIPTION
+    This function uses the Rego files to determine the actual exclusion types used by each policy,
+    providing more accurate mappings than text-based pattern matching.
+
+    .PARAMETER ConfigFilePath
+    The path to the configuration file that will be updated.
+
+    .PARAMETER BaselineDirectory
+    The local directory containing baseline policy files.
+
+    .PARAMETER GitHubDirectoryUrl
+    The URL of the GitHub directory containing baseline policy files.
+
+    .PARAMETER RegoDirectory
+    The directory containing the Rego files. Defaults to the standard ScubaGear Rego directory.
+
+    .PARAMETER ProductFilter
+    An array of product names to filter the policies.
+
+    .PARAMETER AdditionalFields
+    An array of additional fields to include in the policy objects.
+
+    .EXAMPLE
+    Update-ScubaConfigBaselineWithRego -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines" -RegoDirectory ".\Rego"
+    #>
     param(
         [Parameter(Mandatory=$true)]
         [string]$ConfigFilePath,
@@ -10,59 +207,20 @@ function Update-BaselineConfig {
         [string]$GitHubDirectoryUrl,
 
         [Parameter(Mandatory=$false)]
-        [hashtable]$ExclusionTypeMapping = @{
-            # Default mappings - can be overridden
-            "cap" = "cap"
-            "role" = "role"
-            "sensitiveAccounts" = "sensitiveAccounts"
-            "sensitiveUsers" = "sensitiveUsers"
-            "partnerDomains" = "partnerDomains"
-            "forwardingDomains" = "forwardingDomains"
-            "none" = "none"
-        }
+        [string]$RegoDirectory = "$PSScriptRoot\..\..\Rego",
+
+        [Parameter(Mandatory=$false)]
+        [string[]]$ProductFilter = @(),
+
+        [Parameter(Mandatory=$false)]
+        [string[]]$AdditionalFields = @("criticality", "lastModified", "implementation", "mitreMapping", "resources")
     )
 
-    # Function to determine exclusion type based on policy content and ID
-    function Get-ExclusionTypeFromPolicy {
-        param(
-            [string]$PolicyId,
-            [string]$Title,
-            [string]$Implementation,
-            [string]$Rationale
-        )
+    # Get the exclusion mappings from Rego files
+    Write-Host "Analyzing Rego files for exclusion mappings..." -ForegroundColor Yellow
+    $regoMappings = Get-ScubaConfigRegoExclusionMappings -RegoDirectory $RegoDirectory
 
-        # Define mapping rules based on policy patterns
-        $mappingRules = @{
-            # Conditional Access Policy related
-            "legacy authentication|conditional access|high-risk|phishing-resistant|managed devices|device code" = "cap"
-            
-            # Role-based exclusions
-            "highly privileged roles" = "role"
-            
-            # Sensitive account configurations
-            "sensitive account|preset security policy" = "sensitiveAccounts"
-            
-            # Sensitive user configurations  
-            "user impersonation|sensitive user" = "sensitiveUsers"
-            
-            # Partner domain configurations
-            "partner|domain impersonation" = "partnerDomains"
-            
-            # Forwarding domain configurations
-            "forwarding|spf policy" = "forwardingDomains"
-        }
-
-        $contentToCheck = "$Title $Implementation $Rationale".ToLower()
-        
-        foreach ($pattern in $mappingRules.Keys) {
-            if ($contentToCheck -match $pattern) {
-                return $mappingRules[$pattern]
-            }
-        }
-
-        # Default to "none" if no pattern matches
-        return "none"
-    }
+    Write-Host "Found $($regoMappings.Keys.Count) policy exclusion mappings from Rego files" -ForegroundColor Green
 
     # Load existing configuration
     if (-not (Test-Path $ConfigFilePath)) {
@@ -71,48 +229,79 @@ function Update-BaselineConfig {
 
     $configContent = Get-Content $ConfigFilePath -Raw | ConvertFrom-Json
 
-    # Get baseline policies using the provided function
-    $baselinePolicies = Get-BaselinePolicies -BaselineDirectory $BaselineDirectory -GitHubDirectoryUrl $GitHubDirectoryUrl
+    # Get baseline policies
+    $baselinePolicies = Get-ScubaBaselinePolicy -BaselineDirectory $BaselineDirectory -GitHubDirectoryUrl $GitHubDirectoryUrl
+
+    # Filter products if specified
+    if ($ProductFilter.Count -gt 0) {
+        $filteredPolicies = @{}
+        foreach ($product in $ProductFilter) {
+            if ($baselinePolicies.ContainsKey($product)) {
+                $filteredPolicies[$product] = $baselinePolicies[$product]
+            }
+        }
+        $baselinePolicies = $filteredPolicies
+    }
 
     # Create new baselines structure
     $newBaselines = @{}
+    $mappingStats = @{}
 
     foreach ($product in $baselinePolicies.Keys) {
         $policies = $baselinePolicies[$product]
         $productBaseline = @()
 
         foreach ($policy in $policies) {
-            # Determine exclusion type
-            $exclusionType = Get-ExclusionTypeFromPolicy -PolicyId $policy.PolicyId -Title $policy.Title -Implementation $policy.Implementation -Rationale $policy.Rationale
-            
-            # Map to known exclusion types
-            if ($ExclusionTypeMapping.ContainsKey($exclusionType)) {
-                $exclusionType = $ExclusionTypeMapping[$exclusionType]
+            # Use Rego mapping if available, otherwise default to "none"
+            $exclusionType = if ($regoMappings.ContainsKey($policy.PolicyId)) {
+                $regoMappings[$policy.PolicyId]
+            } else {
+                "none"
             }
 
-            # Create policy object
-            $policyObj = [PSCustomObject]@{
+            # Track mapping statistics
+            if (-not $mappingStats.ContainsKey($exclusionType)) {
+                $mappingStats[$exclusionType] = 0
+            }
+            $mappingStats[$exclusionType]++
+
+            # Create policy object with required fields
+            $policyObj = [ordered]@{
                 id = $policy.PolicyId
                 name = $policy.Title
                 exclusionType = $exclusionType
                 rationale = $policy.Rationale
             }
 
-            # Add optional fields if they exist
-            if ($policy.Criticality) {
-                $policyObj | Add-Member -MemberType NoteProperty -Name "criticality" -Value $policy.Criticality
-            }
-            if ($policy.LastModified) {
-                $policyObj | Add-Member -MemberType NoteProperty -Name "lastModified" -Value $policy.LastModified
-            }
-            if ($policy.Implementation) {
-                $policyObj | Add-Member -MemberType NoteProperty -Name "implementation" -Value $policy.Implementation
-            }
-            if ($policy.MITRE_Mapping -and $policy.MITRE_Mapping.Count -gt 0) {
-                $policyObj | Add-Member -MemberType NoteProperty -Name "mitreMapping" -Value $policy.MITRE_Mapping
-            }
-            if ($policy.Resources -and $policy.Resources.Count -gt 0) {
-                $policyObj | Add-Member -MemberType NoteProperty -Name "resources" -Value $policy.Resources
+            # Add additional fields if specified and they exist
+            foreach ($field in $AdditionalFields) {
+                switch ($field) {
+                    "criticality" {
+                        if ($policy.Criticality) {
+                            $policyObj.criticality = $policy.Criticality
+                        }
+                    }
+                    "lastModified" {
+                        if ($policy.LastModified) {
+                            $policyObj.lastModified = $policy.LastModified
+                        }
+                    }
+                    "implementation" {
+                        if ($policy.Implementation) {
+                            $policyObj.implementation = $policy.Implementation
+                        }
+                    }
+                    "mitreMapping" {
+                        if ($policy.MITRE_Mapping -and $policy.MITRE_Mapping.Count -gt 0) {
+                            $policyObj.mitreMapping = $policy.MITRE_Mapping
+                        }
+                    }
+                    "resources" {
+                        if ($policy.Resources -and $policy.Resources.Count -gt 0) {
+                            $policyObj.resources = $policy.Resources
+                        }
+                    }
+                }
             }
 
             $productBaseline += $policyObj
@@ -127,209 +316,17 @@ function Update-BaselineConfig {
     $configContent.baselines = $newBaselines
 
     # Save the updated configuration
-    $configContent | ConvertTo-Json -Depth 10 | Set-Content $ConfigFilePath -Encoding UTF8
-
-    Write-Host "Successfully updated baselines in configuration file: $ConfigFilePath"
-    Write-Host "Updated products: $($newBaselines.Keys -join ', ')"
-    
-    # Summary statistics
-    foreach ($product in $newBaselines.Keys) {
-        $policyCount = $newBaselines[$product].Count
-        $exclusionCounts = $newBaselines[$product] | Group-Object exclusionType | ForEach-Object { "$($_.Name): $($_.Count)" }
-        Write-Host "  $product`: $policyCount policies ($($exclusionCounts -join ', '))"
-    }
-}
-
-# Enhanced version with better exclusion type detection
-function Update-BaselineConfigAdvanced {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$ConfigFilePath,
-
-        [Parameter(Mandatory=$false)]
-        [string]$BaselineDirectory,
-
-        [Parameter(Mandatory=$false)]
-        [string]$GitHubDirectoryUrl,
-
-        [Parameter(Mandatory=$false)]
-        [switch]$UseIntelligentMapping,
-
-        [Parameter(Mandatory=$false)]
-        [hashtable]$CustomExclusionRules = @{}
-    )
-
-    # Enhanced exclusion type detection
-    function Get-SmartExclusionType {
-        param(
-            [string]$PolicyId,
-            [string]$Title,
-            [string]$Implementation,
-            [string]$Rationale
-        )
-
-        # Combine all text for analysis
-        $fullText = "$Title $Implementation $Rationale".ToLower()
-        
-        # Enhanced mapping rules with more specific patterns
-        $smartRules = @{
-            # Conditional Access Policies
-            "cap" = @(
-                "conditional access",
-                "legacy authentication",
-                "high-risk.*user",
-                "high-risk.*sign-in",
-                "phishing-resistant.*mfa",
-                "managed device",
-                "device code.*authentication",
-                "mfa.*enforced",
-                "authentication.*method"
-            )
-            
-            # Role-based exclusions
-            "role" = @(
-                "role assignment",
-                "privileged role",
-                "global administrator",
-                "pam system",
-                "privileged access management",
-                "just.*time",
-                "activation.*role"
-            )
-            
-            # Sensitive accounts
-            "sensitiveAccounts" = @(
-                "sensitive account",
-                "preset security policy",
-                "defender.*office.*365",
-                "exchange online protection",
-                "strict.*preset"
-            )
-            
-            # Sensitive users
-            "sensitiveUsers" = @(
-                "user impersonation",
-                "sensitive user",
-                "impersonation protection"
-            )
-            
-            # Partner domains
-            "partnerDomains" = @(
-                "partner",
-                "domain impersonation",
-                "important partner"
-            )
-            
-            # Forwarding domains
-            "forwardingDomains" = @(
-                "forwarding.*domain",
-                "spf.*policy",
-                "automatic.*forwarding"
-            )
-        }
-
-        # Check custom rules first
-        foreach ($customType in $CustomExclusionRules.Keys) {
-            $customPatterns = $CustomExclusionRules[$customType]
-            foreach ($pattern in $customPatterns) {
-                if ($fullText -match $pattern) {
-                    return $customType
-                }
-            }
-        }
-
-        # Check smart rules
-        foreach ($exclusionType in $smartRules.Keys) {
-            $patterns = $smartRules[$exclusionType]
-            foreach ($pattern in $patterns) {
-                if ($fullText -match $pattern) {
-                    return $exclusionType
-                }
-            }
-        }
-
-        # Policy ID based detection
-        switch -Regex ($PolicyId) {
-            "AAD\.3\." { return "cap" }      # MFA policies
-            "AAD\.2\." { return "cap" }      # Risk-based policies  
-            "AAD\.1\." { return "cap" }      # Legacy auth policies
-            "AAD\.7\." { return "role" }     # Privileged role policies
-            "DEFENDER\.1\." { return "sensitiveAccounts" }  # Defender preset policies
-            "DEFENDER\.2\." { return "sensitiveUsers" }     # Impersonation policies
-            "EXO\.2\." { return "forwardingDomains" }       # SPF policies
-            default { return "none" }
-        }
-    }
-
-    # Load existing configuration
-    if (-not (Test-Path $ConfigFilePath)) {
-        throw "Configuration file not found at: $ConfigFilePath"
-    }
-
-    $configContent = Get-Content $ConfigFilePath -Raw | ConvertFrom-Json
-
-    # Get baseline policies
-    $baselinePolicies = Get-BaselinePolicies -BaselineDirectory $BaselineDirectory -GitHubDirectoryUrl $GitHubDirectoryUrl
-
-    # Create new baselines structure
-    $newBaselines = @{}
-
-    foreach ($product in $baselinePolicies.Keys) {
-        $policies = $baselinePolicies[$product]
-        $productBaseline = @()
-
-        foreach ($policy in $policies) {
-            # Determine exclusion type
-            if ($UseIntelligentMapping) {
-                $exclusionType = Get-SmartExclusionType -PolicyId $policy.PolicyId -Title $policy.Title -Implementation $policy.Implementation -Rationale $policy.Rationale
-            } else {
-                $exclusionType = "none"
-            }
-
-            # Create policy object with all available fields
-            $policyObj = [ordered]@{
-                id = $policy.PolicyId
-                name = $policy.Title
-                exclusionType = $exclusionType
-                rationale = $policy.Rationale
-            }
-
-            # Add optional fields conditionally
-            if ($policy.Criticality) {
-                $policyObj.criticality = $policy.Criticality
-            }
-            if ($policy.LastModified) {
-                $policyObj.lastModified = $policy.LastModified
-            }
-            if ($policy.Implementation) {
-                $policyObj.implementation = $policy.Implementation
-            }
-            if ($policy.MITRE_Mapping -and $policy.MITRE_Mapping.Count -gt 0) {
-                $policyObj.mitreMapping = $policy.MITRE_Mapping
-            }
-            if ($policy.Resources -and $policy.Resources.Count -gt 0) {
-                $policyObj.resources = $policy.Resources
-            }
-
-            $productBaseline += $policyObj
-        }
-
-        if ($productBaseline.Count -gt 0) {
-            $newBaselines[$product] = $productBaseline
-        }
-    }
-
-    # Update the configuration
-    $configContent.baselines = $newBaselines
-
-    # Save the updated configuration with proper formatting
     $jsonOutput = $configContent | ConvertTo-Json -Depth 10
-    
-    # Format JSON nicely (optional - for better readability)
     $jsonOutput | Set-Content $ConfigFilePath -Encoding UTF8
 
     Write-Host "Successfully updated baselines in configuration file: $ConfigFilePath" -ForegroundColor Green
     Write-Host "Updated products: $($newBaselines.Keys -join ', ')" -ForegroundColor Yellow
+    
+    # Show exclusion type statistics
+    Write-Host "`nExclusion Type Statistics:" -ForegroundColor Cyan
+    foreach ($exclusionType in ($mappingStats.Keys | Sort-Object)) {
+        Write-Host "  $exclusionType`: $($mappingStats[$exclusionType]) policies" -ForegroundColor White
+    }
     
     # Detailed summary
     foreach ($product in $newBaselines.Keys) {
@@ -343,7 +340,7 @@ function Update-BaselineConfigAdvanced {
 }
 
 
-function Get-BaselinePolicies {
+function Get-ScubaBaselinePolicy {
     param(
         [Parameter(Mandatory=$false)]
         [string]$BaselineDirectory,
@@ -352,46 +349,7 @@ function Get-BaselinePolicies {
         [string]$GitHubDirectoryUrl
     )
 
-    function Parse-PolicyContent {
-        param([string]$Content)
-        $result = @{
-            Criticality = $null
-            LastModified = $null
-            Rationale = $null
-            MITRE_Mapping = @()
-            Resources = @()
-        }
-        if ($Content -match '<!--Policy:\s*[^;]+;\s*Criticality:\s*([A-Z]+)\s*-->') {
-            $result.Criticality = $matches[1]
-        }
-        if ($Content -match '- _Last modified:_\s*(.+)') {
-            $result.LastModified = $matches[1].Trim()
-        }
-        if ($Content -match '- _Rationale:_\s*(.+)') {
-            $result.Rationale = $matches[1].Trim()
-        }
-        if ($Content -match '(_MITRE ATT&CK TTP Mapping:_[\s\S]+?)(\n\s*\n|###|$)') {
-            $mitreBlock = $matches[1]
-            $mitreList = @()
-            foreach ($line in $mitreBlock -split "`n") {
-                if ($line -match '\[([^\]]+)\]\(([^)]+)\)') {
-                    $mitreList += $line.Trim()
-                }
-            }
-            $result.MITRE_Mapping = $mitreList
-        }
-        if ($Content -match '(?ms)^### Resources\s*(.+?)(^###|\z)') {
-            $resourcesBlock = $matches[1]
-            $resources = @()
-            foreach ($line in $resourcesBlock -split "`n") {
-                if ($line -match '^\s*-\s*\[([^\]]+)\]\(([^)]+)\)') {
-                    $resources += $line.Trim()
-                }
-            }
-            $result.Resources = $resources
-        }
-        return $result
-    }
+    
 
     $policyHeaderPattern = '^####\s+([A-Z0-9\.]+v\d+)\s*$'
     $policiesByProduct = @{}
@@ -496,7 +454,7 @@ function Get-BaselinePolicies {
             }
             if ($inPoliciesSection -and ($line.Trim() -match '^## ' -or $line.Trim() -match '^# ')) {
                 if ($currentPolicy) {
-                    $currentPolicy += Parse-PolicyContent -Content ($currentContent -join "`n")
+                    $currentPolicy += Get-ScubaPolicyContent -Content ($currentContent -join "`n")
                     $policies += [PSCustomObject]$currentPolicy
                     $currentPolicy = $null
                     $currentContent = @()
@@ -508,7 +466,7 @@ function Get-BaselinePolicies {
             if ($inPoliciesSection) {
                 if ($line -match $policyHeaderPattern) {
                     if ($currentPolicy) {
-                        $currentPolicy += Parse-PolicyContent -Content ($currentContent -join "`n")
+                        $currentPolicy += Get-ScubaPolicyContent -Content ($currentContent -join "`n")
                         $policies += [PSCustomObject]$currentPolicy
                         $currentContent = @()
                     }
@@ -533,7 +491,7 @@ function Get-BaselinePolicies {
         }
 
         if ($currentPolicy) {
-            $currentPolicy += Parse-PolicyContent -Content ($currentContent -join "`n")
+            $currentPolicy += Get-ScubaPolicyContent -Content ($currentContent -join "`n")
             $policies += [PSCustomObject]$currentPolicy
         }
 
@@ -551,24 +509,59 @@ function Get-BaselinePolicies {
 
     return $policiesByProduct
 }
-# Usage examples:
-<#
-# Example usage of the Update-BaselineConfig function
-$ScubaBaselines = Get-BaselinePolicies -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines"
 
-# Example 1: Update from local baseline directory
-Update-BaselineConfig -ConfigFilePath ".\ScubaConfig_en-US.json" -BaselineDirectory "C:\path\to\baselines"
-
-# Example 2: Update from GitHub repository
-Update-BaselineConfig -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines"
-
-# Example 3: Use advanced version with intelligent mapping
-Update-BaselineConfigAdvanced -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines" -UseIntelligentMapping
-
-# Example 4: Use with custom exclusion rules
-$customRules = @{
-    "customType" = @("custom pattern 1", "custom pattern 2")
+function Get-ScubaPolicyContent {
+    param([string]$Content)
+    $result = @{
+        Criticality = $null
+        LastModified = $null
+        Rationale = $null
+        MITRE_Mapping = @()
+        Resources = @()
+    }
+    if ($Content -match '<!--Policy:\s*[^;]+;\s*Criticality:\s*([A-Z]+)\s*-->') {
+        $result.Criticality = $matches[1]
+    }
+    if ($Content -match '- _Last modified:_\s*(.+)') {
+        $result.LastModified = $matches[1].Trim()
+    }
+    if ($Content -match '- _Rationale:_\s*(.+)') {
+        $result.Rationale = $matches[1].Trim()
+    }
+    if ($Content -match '(_MITRE ATT&CK TTP Mapping:_[\s\S]+?)(\n\s*\n|###|$)') {
+        $mitreBlock = $matches[1]
+        $mitreList = @()
+        foreach ($line in $mitreBlock -split "`n") {
+            if ($line -match '\[([^\]]+)\]\(([^)]+)\)') {
+                $mitreList += $line.Trim()
+            }
+        }
+        $result.MITRE_Mapping = $mitreList
+    }
+    if ($Content -match '(?ms)^### Resources\s*(.+?)(^###|\z)') {
+        $resourcesBlock = $matches[1]
+        $resources = @()
+        foreach ($line in $resourcesBlock -split "`n") {
+            if ($line -match '^\s*-\s*\[([^\]]+)\]\(([^)]+)\)') {
+                $resources += $line.Trim()
+            }
+        }
+        $result.Resources = $resources
+    }
+    return $result
 }
-Update-BaselineConfigAdvanced -ConfigFilePath ".\ScubaConfig_en-US.json" -BaselineDirectory "C:\path\to\baselines" -UseIntelligentMapping -CustomExclusionRules $customRules
-#>
+<#
+# Get just the mappings
+$regoMappings = Get-ScubaConfigRegoExclusionMappings -RegoDirectory "..\..\Rego"
 
+# Update configuration using Rego mappings
+Update-ScubaConfigBaselineWithRego -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines" -RegoDirectory "..\..\Rego"
+
+# Filter specific products
+Update-ScubaConfigBaselineWithRego -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines" -ProductFilter @("aad", "defender", "exo")
+
+# Update configuration with additional fields
+Update-ScubaConfigBaselineWithRego -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines" -RegoDirectory "..\..\Rego" -AdditionalFields @('criticality')
+#>
+# export
+Export-ModuleMember -Function Get-ScubaBaselinePolicy, Get-ScubaConfigRegoExclusionMappings, Update-ScubaConfigBaselineWithRego
