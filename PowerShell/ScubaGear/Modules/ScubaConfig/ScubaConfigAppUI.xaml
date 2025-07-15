@@ -321,8 +321,8 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Vertical">
-                <TextBlock x:Name="TitleTextBlock" FontSize="22" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
-                <TextBlock x:Name="SubtitleTextBlock" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
+                <TextBlock x:Name="Title_TextBlock" FontSize="22" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
+                <TextBlock x:Name="SubTitle_TextBlock" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
@@ -360,37 +360,37 @@
                                             <TextBlock Text="Organization" FontWeight="Medium"/>
                                             <TextBlock Text="*" Foreground="Red" FontWeight="Bold"/>
                                         </StackPanel>
-                                        <TextBox x:Name="OrganizationTextBox" Text="example.onmicrosoft.com"/>
+                                        <TextBox x:Name="Organization_TextBox" Text="example.onmicrosoft.com"/>
                                         <TextBlock Text="Required. Must be in format: name.onmicrosoft.com or name.onmicrosoft.us" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,0,0"/>
                                     </StackPanel>
 
                                     <!-- Organization Name -->
                                     <StackPanel Margin="0,0,0,16">
                                         <TextBlock Text="Organization Name"  FontWeight="Medium"  Margin="0,0,0,4"/>
-                                        <TextBox x:Name="OrgNameTextBox" Text="Your organization name"/>
+                                        <TextBox x:Name="OrgName_TextBox" Text="Your organization name"/>
                                     </StackPanel>
 
                                     <!-- Organization Unit Name -->
                                     <StackPanel Margin="0,0,0,16">
                                         <TextBlock Text="Organization Unit Name" FontWeight="Medium" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="OrgUnitTextBox" Text="Your organization unit name"/>
+                                        <TextBox x:Name="OrgUnit_TextBox" Text="Your organization unit name"/>
                                     </StackPanel>
 
                                     <!-- Description -->
                                     <StackPanel Margin="0,0,0,16">
                                         <TextBlock Text="Description" FontWeight="Medium" Margin="0,0,0,4"/>
-                                        <TextBox x:Name="DescriptionTextBox" Text="Organization description or purpose of this configuration" Height="66" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8"/>
+                                        <TextBox x:Name="Description_TextBox" Text="Organization description or purpose of this configuration" Height="66" TextWrapping="Wrap" AcceptsReturn="True" VerticalContentAlignment="Top" Padding="8"/>
                                     </StackPanel>
 
                                     <!-- M365 Environment -->
                                     <StackPanel Margin="0,0,0,16">
-                                        <TextBlock x:Name="EnvironmentTextBlock" Text="M365 Environment" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Environment_TextBlock" Text="M365 Environment" FontWeight="Medium" Margin="0,0,0,4"/>
                                         <ComboBox x:Name="EnvironmentComboBox" Width="380" HorizontalAlignment="Left"/>
                                     </StackPanel>
 
                                     <!-- Products -->
                                     <StackPanel Margin="0,0,0,16">
-                                        <TextBlock x:Name="ProductsTextBlock" Text="Products" FontWeight="Medium" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Products_TextBlock" Text="Products" FontWeight="Medium" Margin="0,0,0,4"/>
                                         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                             <Button x:Name="SelectAllButton"
                                                 Style="{StaticResource SecondaryButton}"
@@ -423,7 +423,7 @@
                                     <!-- Products Supporting Exclusions -->
                                     <StackPanel Margin="0,0,0,0">
                                         <TextBlock Text="Products Supporting Exclusions" FontWeight="Medium" Margin="0,0,0,4"/>
-                                        <TextBlock x:Name="ExclusionsInfoTextBlock" Foreground="{StaticResource MutedTextBrush}"/>
+                                        <TextBlock x:Name="ExclusionsInfo_TextBlock" Foreground="{StaticResource MutedTextBrush}"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -447,7 +447,7 @@
                                         FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryBrush}"
                                         Margin="0,0,0,8"/>
-                                <TextBlock x:Name="ExclusionsTabInfoTextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBlock x:Name="ExclusionsTabInfo_TextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                             </StackPanel>
                         </Border>
 
@@ -566,7 +566,7 @@
                                         FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryBrush}"
                                         Margin="0,0,0,8"/>
-                                <TextBlock x:Name="AnnotationsTabInfoTextBlock" 
+                                <TextBlock x:Name="AnnotationsTabInfo_TextBlock" 
                                         Text="Add comments and annotations to policies for documentation and tracking purposes. Products must be selected on the main page before configuring annotations."
                                         TextWrapping="Wrap" 
                                         Foreground="{StaticResource MutedTextBrush}"/>
@@ -687,7 +687,7 @@
                                            FontWeight="SemiBold"
                                            Foreground="{StaticResource PrimaryBrush}"
                                            Margin="0,0,0,8"/>
-                                <TextBlock x:Name="OmissionsTabInfoTextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                <TextBlock x:Name="OmissionsTabInfo_TextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                             </StackPanel>
                         </Border>
 
@@ -808,11 +808,11 @@
                                             <StackPanel x:Name="ApplicationSectionContent" Visibility="Collapsed">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="AppID:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="AppIdTextBox" Width="300"/>
+                                                    <TextBox x:Name="AppId_TextBox" Width="300"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="Certificate:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="CertificateTextBox" MinWidth="300" Width="Auto"/>
+                                                    <TextBox x:Name="Certificate_TextBox" MinWidth="300" Width="Auto"/>
                                                     <Button x:Name="SelectCertificateButton" Content="Select..." Style="{StaticResource SecondaryButton}" Width="70" Height="24" Margin="8,0,0,0"/>
                                                 </StackPanel>
                                             </StackPanel>
@@ -830,21 +830,21 @@
                                             <StackPanel x:Name="OutputSectionContent" Visibility="Collapsed">
                                                  <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="Output Path:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="OutPathTextBox" Width="220" Text="."/>
+                                                    <TextBox x:Name="OutPath_TextBox" Width="220" Text="."/>
                                                     <Button x:Name="BrowseOutPathButton" Content="Browse..." Style="{StaticResource SecondaryButton}"
                                                             Width="70" Height="24" Margin="8,0,0,0"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="Folder Name:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="OutFolderNameTextBox" Width="300" Text="M365BaselineConformance"/>
+                                                    <TextBox x:Name="OutFolderName_TextBox" Width="300" Text="M365BaselineConformance"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="JSON File:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="OutJsonFileNameTextBox" Width="300" Text="ScubaResults"/>
+                                                    <TextBox x:Name="OutJsonFileName_TextBox" Width="300" Text="ScubaResults"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="CSV File:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="OutCsvFileNameTextBox" Width="300" Text="ScubaResults"/>
+                                                    <TextBox x:Name="OutCsvFileName_TextBox" Width="300" Text="ScubaResults"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -861,7 +861,7 @@
                                             <StackPanel x:Name="OpaSectionContent" Visibility="Collapsed">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                 <TextBlock Text="OPA Path:" Width="120" VerticalAlignment="Center"/>
-                                                <TextBox x:Name="OpaPathTextBox" Width="220" Text="."/>
+                                                <TextBox x:Name="OpaPath_TextBox" Width="220" Text="."/>
                                                 <Button x:Name="BrowseOpaPathButton" Content="Browse..." Style="{StaticResource SecondaryButton}"
                                                         Width="70" Height="24" Margin="8,0,0,0"/>
                                                 </StackPanel>
@@ -909,13 +909,13 @@
                                         FontSize="18"
                                         FontWeight="SemiBold"
                                         Margin="0,0,0,16"/>
-                                    <TextBlock x:Name="PreviewTabInfoTextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                    <TextBlock x:Name="PreviewTabInfo_TextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                                 </StackPanel>
                             </Border>
                             
                             <Border Grid.Row="1" >
                                 <StackPanel Margin="0,16,0,0">
-                                    <TextBox x:Name="YamlPreviewTextBox"
+                                    <TextBox x:Name="YamlPreview_TextBox"
                                          Height="Auto"
                                          FontFamily="Consolas, Courier New, monospace"
                                          FontSize="14"

@@ -1,13 +1,34 @@
 {
   "localeContext": {
-    "TitleTextBlock": "Scuba Configuration Editor",
-    "SubtitleTextBlock": "Create a ScubaGear configuration file for exclusions and omissions",
-    "EnvironmentTextBlock": "Select M365 Environment",
-    "ProductsTextBlock": "Select Products",
-    "ExclusionsInfoTextBlock": "Exclusions are supported for the following products: {0}",
-    "ExclusionsTabInfoTextBlock": "Configure exclusions for specific policies. Exclusions allow you to customize policy behavior by excluding specific users, groups, domains, or other entities from policy evaluation. Products must be selected on the main page before configuring exclusions.",
-    "OmissionsTabInfoTextBlock": "Select policies to omit from the assessment and provide justification. Products must be selected on the main page before configuring omissions.",
-    "PreviewTabInfoTextBlock": "Preview your configuration before saving. Ensure all exclusions and omissions are correctly set."
+    "Title_TextBlock": "Scuba Configuration Editor",
+    "SubTitle_TextBlock": "Create a ScubaGear configuration file for exclusions, annotations, and omissions",
+    "Environment_TextBlock": "Select M365 Environment",
+    "Products_TextBlock": "Select Products",
+    "ExclusionsInfo_TextBlock": "Exclusions are supported for the following products: {0}",
+    "ExclusionsTabInfo_TextBlock": "Configure exclusions for specific policies. Exclusions allow you to customize policy behavior by excluding specific users, groups, domains, or other entities from policy evaluation. Products must be selected on the main page before configuring exclusions.",
+    "OmissionsTabInfo_TextBlock": "Select policies to omit from the assessment and provide justification. Products must be selected on the main page before configuring omissions.",
+    "PreviewTabInfo_TextBlock": "Preview your configuration before saving. Ensure all exclusions and omissions are correctly set."
+  },
+  "localePlaceholder" : {
+    "Organization_TextBox" : "Enter tenant name (e.g., example.onmicrosoft.com)",
+    "OrgName_TextBox" : "Enter organization name",
+    "OrgUnit_TextBox" : "Enter organizational unit (optional)",
+    "Description_TextBox" : "Enter a description for this configuration (optional)"
+  },
+  "localeInfoMessages": {
+    "NewSessionConfirmation": "Are you sure you want to start a new session? This will clear all current selections and configurations.",
+    "ImportSuccess": "Configuration imported successfully.",
+    "CopySuccess": "YAML configuration copied to clipboard successfully."
+  },
+  "localeErrorMessages": {
+    "CertificateNotFound": "No suitable certificates found in the current user's personal certificate store.",
+    "WindowError": "Error loading",
+    "OrganizationValidation" : "Organization Name is required and must be in format: name.onmicrosoft.com or name.onmicrosoft.us",
+    "AppIdValidation": "Application ID must be in GUID format (e.g., 12345678-1234-1234-1234-123456789abc)",
+    "CertificateValidation": "Certificate Thumbprint must be 40 hexadecimal characters",
+    "PreviewValidation": "Please review all fields for errors before proceeding.",
+    "CopyError": "No YAML content to copy. Please generate the configuration first.",
+    "DownloadNullError": "No YAML content to download. Please generate the configuration first"
   },
   "products": [
     {
@@ -994,7 +1015,7 @@
   },
   "exclusionTypes": {
     "capolicy": {
-      "name": "capolicyExclusions",
+      "name": "CapExclusions",
       "description": "Exclude specific groups or users from conditional access policies",
       "fields": [
         {
