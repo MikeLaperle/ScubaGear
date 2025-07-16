@@ -269,10 +269,10 @@ Function Invoke-SCuBAConfigAppUI {
     # Connect to Microsoft Graph if Online parameter is used
     if ($Online) {
         try {
-            Write-Host "Connecting to Microsoft Graph..." -ForegroundColor Green
+            Write-Output "Connecting to Microsoft Graph..."
             Connect-MgGraph -Scopes "User.Read.All", "Group.Read.All", "Policy.Read.All", "Organization.Read.All" -NoWelcome -Environment $graphEnvironment -ErrorAction Stop | Out-Null
             $Online = $true
-            Write-Host "Successfully connected to Microsoft Graph" -ForegroundColor Green
+            Write-Output "Successfully connected to Microsoft Graph"
         }
         catch {
             Write-Warning "Failed to connect to Microsoft Graph: $($_.Exception.Message)"
@@ -282,18 +282,7 @@ Function Invoke-SCuBAConfigAppUI {
         $Online = $false
     }
 
-    If($YAMLConfigFile){
-        If(test-path -Path $YAMLConfigFile){
-            Write-Verbose ("{0}: Loading YAML configuration from {1}" -f ${CmdletName}, $YAMLConfigFile)
-            $yamlObject = Get-Content -Path $YAMLConfigFile -Raw | ConvertFrom-Yaml
-            <#populate
-                $syncHash.Exclusions = @()
-                $syncHash.Omissions = @()
-                $syncHash.Annotations = @()
-                $syncHash.GeneralSettings = @{}
-            #>
-        }
-    }
+
 
     # build a hash table with locale data to pass to runspace
     $syncHash = [hashtable]::Synchronized(@{})
@@ -302,7 +291,7 @@ Function Invoke-SCuBAConfigAppUI {
     $syncHash.GraphConnected = $Online
     $syncHash.XamlPath = "$PSScriptRoot\ScubaConfigAppUI.xaml"
     $syncHash.UIConfigPath = "$PSScriptRoot\ScubaConfig_$Language.json"
-    $syncHash.YAMLImport = $YAMLConfig
+    $syncHash.YAMLImport = $YAMLConfigFile
     $syncHash.GraphEndpoint = $GraphEndpoint
     $syncHash.M365Environment = $M365Environment
     $syncHash.Exclusions = @()
@@ -336,8 +325,229 @@ Function Invoke-SCuBAConfigAppUI {
         $UIXML.SelectNodes("//*[@Name]") | %{ $syncHash."$($_.Name)" = $syncHash.Window.FindName($_.Name)}
 
         #===========================================================================
-        # REACTIVE UI SYSTEM - Data-Driven Updates
+        # UPDATE UI FUNCTIONS
         #===========================================================================
+
+        # Function to update all UI elements from data
+        Function Update-AllUIFromData {
+            # Update exclusions
+            Update-ExclusionsFromData
+
+            # Update omissions
+            Update-OmissionsFromData
+
+            # Update annotations
+            Update-AnnotationsFromData
+
+            # Update general settings
+            Update-GeneralSettingsFromData
+        }
+
+        # Function to update exclusions UI from data
+        Function Update-ExclusionsFromData {
+            if (-not $syncHash.Exclusions) { return }
+
+            foreach ($exclusion in $syncHash.Exclusions) {
+                try {
+                    $policyId = $exclusion.Id
+                    $productName = $exclusion.Product
+
+                    # Find the exclusion type from the baseline config
+                    $baseline = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
+                    if ($baseline -and $baseline.exclusionType -ne "none") {
+                        Update-ExclusionCardUI -PolicyId $policyId -ProductName $productName -ExclusionData $exclusion.Data -ExclusionType $baseline.exclusionType
+                    }
+                }
+                catch {
+                    Write-Output "Error updating exclusion UI for $($exclusion.Id): $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # Function to update omissions UI from data
+        Function Update-OmissionsFromData {
+            if (-not $syncHash.Omissions) { return }
+
+            foreach ($omission in $syncHash.Omissions) {
+                try {
+                    Update-OmissionCardUI -PolicyId $omission.Id -ProductName $omission.Product -Rationale $omission.Rationale -Expiration $omission.Expiration
+                }
+                catch {
+                    Write-Output "Error updating omission UI for $($omission.Id): $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # Function to update annotations UI from data
+        Function Update-AnnotationsFromData {
+            if (-not $syncHash.Annotations) { return }
+
+            foreach ($annotation in $syncHash.Annotations) {
+                try {
+                    Update-AnnotationCardUI -PolicyId $annotation.Id -ProductName $annotation.Product -Comment $annotation.Comment
+                }
+                catch {
+                    Write-Output "Error updating annotation UI for $($annotation.Id): $($_.Exception.Message)"
+                }
+            }
+        }
+
+        # Function to update general settings UI from data (Dynamic Version)
+        Function Update-GeneralSettingsFromData {
+            if (-not $syncHash.GeneralSettings) { return }
+
+            try {
+                foreach ($settingKey in $syncHash.GeneralSettings.Keys) {
+                    $settingValue = $syncHash.GeneralSettings[$settingKey]
+
+                    # Skip if value is null or empty
+                    if ($null -eq $settingValue) { continue }
+
+                    # Find the corresponding XAML control using various naming patterns
+                    $control = Find-ControlBySettingName -SettingName $settingKey
+
+                    if ($control) {
+                        Update-ControlValue -Control $control -Value $settingValue -SettingKey $settingKey
+                    } else {
+                        Write-Verbose "No UI control found for setting: $settingKey"
+                    }
+                }
+
+                # Handle special cases that need custom logic
+                Handle-SpecialSettingsCases
+
+            }
+            catch {
+                Write-Output "Error updating general settings UI: $($_.Exception.Message)"
+            }
+        }
+
+        # Helper function to find control by setting name
+        Function Find-ControlBySettingName {
+            param([string]$SettingName)
+
+            # Define naming patterns to try
+            $namingPatterns = @(
+                $SettingName,                           # Direct name
+                "$SettingName`_TextBox",                # SettingName_TextBox
+                "$SettingName`_TextBlock",              # SettingName_TextBlock
+                "$SettingName`_CheckBox",               # SettingName_CheckBox
+                "$SettingName`_ComboBox",               # SettingName_ComboBox
+                "$SettingName`_Label",                  # SettingName_Label
+                "$SettingName`TextBox",                 # SettingNameTextBox
+                "$SettingName`TextBlock",               # SettingNameTextBlock
+                "$SettingName`CheckBox",                # SettingNameCheckBox
+                "$SettingName`ComboBox",                # SettingNameComboBox
+                "$SettingName`Label",                   # SettingNameLabel
+                "txt$SettingName",                      # txtSettingName
+                "chk$SettingName",                      # chkSettingName
+                "cbo$SettingName",                      # cboSettingName
+                "lbl$SettingName"                       # lblSettingName
+            )
+
+            # Try each pattern
+            foreach ($pattern in $namingPatterns) {
+                if ($syncHash.$pattern) {
+                    return $syncHash.$pattern
+                }
+            }
+
+            return $null
+        }
+
+        # Helper function to update control value based on type
+        Function Update-ControlValue {
+            param(
+                [object]$Control,
+                [object]$Value,
+                [string]$SettingKey
+            )
+
+            switch ($Control.GetType().Name) {
+                'TextBox' {
+                    $Control.Text = $Value
+                    $Control.Foreground = [System.Windows.Media.Brushes]::Black
+                    $Control.FontStyle = [System.Windows.FontStyles]::Normal
+                }
+                'TextBlock' {
+                    $Control.Text = $Value
+                }
+                'CheckBox' {
+                    $Control.IsChecked = [bool]$Value
+                }
+                'ComboBox' {
+                    Update-ComboBoxValue -ComboBox $Control -Value $Value -SettingKey $SettingKey
+                }
+                'Label' {
+                    $Control.Content = $Value
+                }
+                default {
+                    Write-Verbose "Unknown control type for $SettingKey`: $($Control.GetType().Name)"
+                }
+            }
+        }
+
+        # Helper function to update ComboBox values
+        Function Update-ComboBoxValue {
+            param(
+                [System.Windows.Controls.ComboBox]$ComboBox,
+                [object]$Value,
+                [string]$SettingKey
+            )
+
+            # Try to find item by Tag first (common for environment selection)
+            $selectedItem = $ComboBox.Items | Where-Object { $_.Tag -eq $Value }
+
+            # If not found, try by Content
+            if (-not $selectedItem) {
+                $selectedItem = $ComboBox.Items | Where-Object { $_.Content -eq $Value }
+            }
+
+            # If still not found, try by string representation
+            if (-not $selectedItem) {
+                $selectedItem = $ComboBox.Items | Where-Object { $_.ToString() -eq $Value }
+            }
+
+            if ($selectedItem) {
+                $ComboBox.SelectedItem = $selectedItem
+            } else {
+                Write-Verbose "Could not find ComboBox item for value: $Value in $SettingKey"
+            }
+        }
+
+        # Function to handle special cases that need custom logic
+        Function Handle-SpecialSettingsCases {
+            # Handle ProductNames (checkbox selection)
+            if ($syncHash.GeneralSettings.ProductNames) {
+                $allProductCheckboxes = $syncHash.ProductsGrid.Children | Where-Object {
+                    $_ -is [System.Windows.Controls.CheckBox] -and $_.Name -like "*ProductCheckBox"
+                }
+
+                # First uncheck all products
+                foreach ($checkbox in $allProductCheckboxes) {
+                    $checkbox.IsChecked = $false
+                }
+
+                # Then check the selected products
+                if ($syncHash.GeneralSettings.ProductNames -contains "*") {
+                    # Select all products
+                    foreach ($checkbox in $allProductCheckboxes) {
+                        $checkbox.IsChecked = $true
+                    }
+                } else {
+                    # Select specific products
+                    foreach ($productName in $syncHash.GeneralSettings.ProductNames) {
+                        $checkbox = $allProductCheckboxes | Where-Object { $_.Tag -eq $productName }
+                        if ($checkbox) {
+                            $checkbox.IsChecked = $true
+                        }
+                    }
+                }
+            }
+
+            # Handle any other special cases here
+            # For example, if you have complex controls that need special handling
+        }
 
         # Create a DispatcherTimer for periodic UI updates
         $syncHash.UIUpdateTimer = New-Object System.Windows.Threading.DispatcherTimer
@@ -351,7 +561,7 @@ Function Invoke-SCuBAConfigAppUI {
                 }
             }
             catch {
-                Write-Host "Error in UI update timer: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Output "Error in UI update timer: $($_.Exception.Message)"
             }
         })
 
@@ -368,8 +578,11 @@ Function Invoke-SCuBAConfigAppUI {
         Function Set-DataChanged {
             $syncHash.DataChanged = $true
         }
-
-
+        #===========================================================================
+        #
+        # Load UI Configuration
+        #
+        #===========================================================================
         #Import configuration file
         $syncHash.UIConfigs = Get-Content -Path $syncHash.UIConfigPath -Raw | ConvertFrom-Json
 
@@ -403,48 +616,32 @@ Function Invoke-SCuBAConfigAppUI {
         }
 
         $syncHash.PreviewTab.IsEnabled = $false
-        
+
         $syncHash.ExclusionsTab.IsEnabled = $false
         $syncHash.AnnotatePolicyTab.IsEnabled = $false
         $syncHash.OmitPolicyTab.IsEnabled = $false
-        #===========================================================================
-        # Populate Dynamic Controls from Configuration
-        #===========================================================================
-        # Populate M365 Environment ComboBox
+
         foreach ($env in $syncHash.UIConfigs.SupportedM365Environment) {
             $comboItem = New-Object System.Windows.Controls.ComboBoxItem
-            $comboItem.Content = "$($env.displayName) ($($env.id))"
+            $comboItem.Content = "$($env.displayName) ($($env.name))"
             $comboItem.Tag = $env.id
 
-            $syncHash.EnvironmentComboBox.Items.Add($comboItem)
+            $syncHash.M365Environment_ComboBox.Items.Add($comboItem)
         }
-        # Set default selection
-        $syncHash.EnvironmentComboBox.SelectedIndex = 0
 
-        If($syncHash.GraphConnected){
-            $selectedEnv = $syncHash.EnvironmentComboBox.Items | Where-Object { $_.Tag -eq $syncHash.M365Environment }
-            $syncHash.SelectedEnv = $syncHash.EnvironmentComboBox.Items
+        # Set selection based on parameter or default to first item
+        if ($syncHash.M365Environment) {
+            $selectedEnv = $syncHash.M365Environment_ComboBox.Items | Where-Object { $_.Tag -eq $syncHash.M365Environment }
             if ($selectedEnv) {
-                $syncHash.EnvironmentComboBox.SelectedItem = $selectedEnv
+                $syncHash.M365Environment_ComboBox.SelectedItem = $selectedEnv
+            } else {
+                # If the specified environment isn't found, default to first item
+                $syncHash.M365Environment_ComboBox.SelectedIndex = 0
             }
+        } else {
+            # Set default selection to first item if no parameter specified
+            $syncHash.M365Environment_ComboBox.SelectedIndex = 0
         }
-
-        <#populate each baseline items
-        foreach ($baseline in $syncHash.UIConfigs.baselines.aad | Where-Object {$_.exclusionType -ne 'none'}) {
-            $ListName = ($baseline.id + ": " + $baseline.name)
-            $syncHash.AadBaselineComboBox.Items.Add($ListName)
-        }
-
-        foreach ($baseline in $syncHash.UIConfigs.baselines.defender | Where-Object {$_.exclusionType -ne 'none'}) {
-            $ListName = ($baseline.id + ": " + $baseline.name)
-            $syncHash.DefenderBaselineComboBox.Items.Add($ListName)
-        }
-
-        foreach ($baseline in $syncHash.UIConfigs.baselines.exo | Where-Object {$_.exclusionType -ne 'none'}) {
-            $ListName = ($baseline.id + ": " + $baseline.name)
-            $syncHash.ExoBaselineComboBox.Items.Add($ListName)
-        }
-        #>
 
         # Populate Products Checkbox dynamically within the ProductsGrid
         #only list three rows then use next column
@@ -745,8 +942,8 @@ Function Invoke-SCuBAConfigAppUI {
 
                     $syncHash.Annotations += $annotation
 
-                    Write-Host "Annotation added for $policyId. Total annotations: $($syncHash.Annotations.Count)" -ForegroundColor Green
-                    Write-Host "Comment: $comment" -ForegroundColor Cyan
+                    Write-Output "Annotation added for $policyId. Total annotations: $($syncHash.Annotations.Count)"
+                    Write-Output "Comment: $comment"
                 }
 
                 [System.Windows.MessageBox]::Show("[$policyId] annotation saved successfully.", "Success", "OK", "Information")
@@ -1176,7 +1373,7 @@ Function Invoke-SCuBAConfigAppUI {
                 $inputRow.Margin = "0,0,0,8"
 
                 $inputTextBox = New-Object System.Windows.Controls.TextBox
-                $inputTextBox.Name = $fieldName + "_Input"
+                $inputTextBox.Name = $fieldName + "_TextBox"
                 $inputTextBox.Width = 250
                 $inputTextBox.Height = 26
                 $inputTextBox.VerticalContentAlignment = "Center"
@@ -1289,7 +1486,7 @@ Function Invoke-SCuBAConfigAppUI {
             } elseif ($Field.type -eq "string") {
                 # Create single string input
                 $stringTextBox = New-Object System.Windows.Controls.TextBox
-                $stringTextBox.Name = $fieldName
+                $stringTextBox.Name = $fieldName + "_TextBox"
                 $stringTextBox.Width = 400
                 $stringTextBox.Height = 26
                 $stringTextBox.VerticalContentAlignment = "Center"
@@ -1385,7 +1582,7 @@ Function Invoke-SCuBAConfigAppUI {
                                 $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
                                 $inputTextBox.FontStyle = "Italic"
 
-                                Write-Host "Added $($selectedUsers.Count) users to exclusion list" -ForegroundColor Green
+                                Write-Output "Added $($selectedUsers.Count) users to exclusion list"
                             }
                         }
                         catch {
@@ -1466,7 +1663,7 @@ Function Invoke-SCuBAConfigAppUI {
                                 $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
                                 $inputTextBox.FontStyle = "Italic"
 
-                                Write-Host "Added $($selectedGroups.Count) groups to exclusion list" -ForegroundColor Green
+                                Write-Output "Added $($selectedGroups.Count) groups to exclusion list"
                             }
                         }
                         catch {
@@ -1711,8 +1908,8 @@ Function Invoke-SCuBAConfigAppUI {
 
                     $syncHash.Exclusions += $exclusion
 
-                    Write-Host "Exclusion added for $policyId. Total exclusions: $($syncHash.Exclusions.Count)" -ForegroundColor Green
-                    Write-Host "Exclusion data: $($exclusionData | ConvertTo-Json -Depth 3)" -ForegroundColor Cyan
+                    Write-Output "Exclusion added for $policyId. Total exclusions: $($syncHash.Exclusions.Count)"
+                    Write-Output "Exclusion data: $($exclusionData | ConvertTo-Json -Depth 3)"
                 }
 
                 [System.Windows.MessageBox]::Show("[$policyId] exclusion saved successfully.", "Success", "OK", "Information")
@@ -1873,7 +2070,7 @@ Function Invoke-SCuBAConfigAppUI {
                         $queryParams.Uri += $syncHash.GraphEndpoint + "?" + ($queryStringParts -join "&")
                     }
 
-                    Write-Host "Graph Query URI: $($queryParams.Uri)" -ForegroundColor Cyan
+                    Write-Output "Graph Query URI: $($queryParams.Uri)"
 
                     # Execute the Graph request
                     $result = Invoke-MgGraphRequest @queryParams
@@ -2010,38 +2207,38 @@ Function Invoke-SCuBAConfigAppUI {
         #===========================================================================
 
         # Application Section Toggle
-        $syncHash.ApplicationSectionToggle.Add_Checked({
+        $syncHash.ApplicationSection_Toggle.Add_Checked({
             $syncHash.ApplicationSectionContent.Visibility = [System.Windows.Visibility]::Visible
         })
 
-        $syncHash.ApplicationSectionToggle.Add_Unchecked({
+        $syncHash.ApplicationSection_Toggle.Add_Unchecked({
             $syncHash.ApplicationSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
         })
 
         # Output Section Toggle
-        $syncHash.OutputSectionToggle.Add_Checked({
+        $syncHash.OutputSection_Toggle.Add_Checked({
             $syncHash.OutputSectionContent.Visibility = [System.Windows.Visibility]::Visible
         })
 
-        $syncHash.OutputSectionToggle.Add_Unchecked({
+        $syncHash.OutputSection_Toggle.Add_Unchecked({
             $syncHash.OutputSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
         })
 
         # OPA Section Toggle
-        $syncHash.OpaSectionToggle.Add_Checked({
+        $syncHash.OpaSection_Toggle.Add_Checked({
             $syncHash.OpaSectionContent.Visibility = [System.Windows.Visibility]::Visible
         })
 
-        $syncHash.OpaSectionToggle.Add_Unchecked({
+        $syncHash.OpaSection_Toggle.Add_Unchecked({
             $syncHash.OpaSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
         })
 
         # General Section Toggle
-        $syncHash.GeneralSectionToggle.Add_Checked({
+        $syncHash.GeneralSection_Toggle.Add_Checked({
             $syncHash.GeneralSectionContent.Visibility = [System.Windows.Visibility]::Visible
         })
 
-        $syncHash.GeneralSectionToggle.Add_Unchecked({
+        $syncHash.GeneralSection_Toggle.Add_Unchecked({
             $syncHash.GeneralSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
         })
 
@@ -2094,7 +2291,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $_.Subject -notlike "*Microsoft*"
                 } | Sort-Object Subject
 
-                Write-Host "Found $($userCerts.Count) certificates" -ForegroundColor Cyan
+                Write-Output "Found $($userCerts.Count) certificates"
 
                 if ($userCerts.Count -eq 0) {
                     [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localeErrorMessages.CertificateNotFound,
@@ -2131,7 +2328,7 @@ Function Invoke-SCuBAConfigAppUI {
                     # Get the first (and only) selected certificate
                     $selectedCert = $selectedCerts[0]
 
-                    $syncHash.Certificate_TextBox.Text = $selectedCert.Thumbprint
+                    $syncHash.CertificateThumbprint_TextBox.Text = $selectedCert.Thumbprint
 
                 }
             }
@@ -2153,7 +2350,7 @@ Function Invoke-SCuBAConfigAppUI {
                 [Parameter(Mandatory)]
                 [ValidateSet("users", "groups")]
                 [string]$GraphEntityType,
-                
+
                 [string]$SearchTerm = "",
                 [int]$Top = 100
             )
@@ -2621,7 +2818,7 @@ Function Invoke-SCuBAConfigAppUI {
             # Advanced Tab Validations (only if sections are toggled on)
 
             # Application Section Validations
-            if ($syncHash.ApplicationSectionToggle.IsChecked) {
+            if ($syncHash.ApplicationSection_Toggle.IsChecked) {
 
                 # AppID validation (GUID format)
 
@@ -2629,7 +2826,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $appIdValid = Confirm-UIField -UIElement $syncHash.AppId_TextBox `
                                                  -RegexPattern "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" `
                                                  -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.AppIdValidation `
-                                                 -PlaceholderText "Your Application ID" `
+                                                 -PlaceholderText $syncHash.UIConfigs.localePlaceholder.AppId_TextBox `
                                                  -ShowMessageBox:$false
 
                     if (-not $appIdValid) {
@@ -2641,10 +2838,10 @@ Function Invoke-SCuBAConfigAppUI {
                 # Certificate Thumbprint validation (40 character hex)
 
 
-                    $certValid = Confirm-UIField -UIElement $syncHash.Certificate_TextBox `
+                    $certValid = Confirm-UIField -UIElement $syncHash.CertificateThumbprint_TextBox `
                                                 -RegexPattern "^[0-9a-fA-F]{40}$" `
                                                 -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.CertificateValidation `
-                                                -PlaceholderText "Certificate Thumbprint" `
+                                                -PlaceholderText $syncHash.UIConfigs.localePlaceholder.CertificateThumbprint_TextBox `
                                                 -ShowMessageBox:$false
 
                     if (-not $certValid) {
@@ -2690,11 +2887,17 @@ Function Invoke-SCuBAConfigAppUI {
                     $yamlContent = Get-Content -Path $openFileDialog.FileName -Raw
                     $yamlObject = $yamlContent | ConvertFrom-Yaml
 
-                    # Store the imported configuration for potential timer-based updates
-                    $syncHash.ImportedConfig = $yamlObject
+                    # Clear existing data
+                    $syncHash.Exclusions = @()
+                    $syncHash.Omissions = @()
+                    $syncHash.Annotations = @()
+                    $syncHash.GeneralSettings = @{}
 
-                    # Import and populate all form fields
-                    Import-YamlConfiguration -Config $yamlObject
+                    # Import data into the core data structures
+                    Import-YamlToDataStructures -Config $yamlObject
+
+                    # Trigger UI update through reactive system
+                    Set-DataChanged
 
                     [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localeInfoMessages.ImportSuccess, "Import Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                 }
@@ -2763,593 +2966,236 @@ Function Invoke-SCuBAConfigAppUI {
         # Helper Functions
         #===========================================================================
         # Function to import YAML configuration and populate UI fields
-                # Function to import YAML configuration and populate UI fields
-        Function Import-YamlConfiguration {
+        # Function to import YAML data into core data structures (without UI updates)
+        Function Import-YamlToDataStructures {
             param($Config)
 
             try {
-                # Reset form first
-                Reset-FormFields
+                # Get top-level keys regardless of object type
+                $topLevelKeys = if ($Config -is [hashtable]) { $Config.Keys } else { $Config.PSObject.Properties.Name }
 
-                # Main tab fields
-                if ($Config.Organization) {
-                    $syncHash.Organization_TextBox.Text = $Config.Organization
-                    $syncHash.Organization_TextBox.Foreground = [System.Windows.Media.Brushes]::Black
-                    $syncHash.Organization_TextBox.FontStyle = [System.Windows.FontStyles]::Normal
+                #get all products from UIConfigs
+                $productIds = $syncHash.UIConfigs.products | Select-Object -ExpandProperty id
+
+                # Import General Settings that are not product
+                $generalSettingsFields = $topLevelKeys | Where-Object {$_ -notin $productIds}
+
+                foreach ($field in $generalSettingsFields) {
+                    $syncHash.GeneralSettings[$field] = $Config.$field
                 }
 
-                if ($Config.OrgName) {
-                    $syncHash.OrgName_TextBox.Text = $Config.OrgName
-                    $syncHash.OrgName_TextBox.Foreground = [System.Windows.Media.Brushes]::Black
-                    $syncHash.OrgName_TextBox.FontStyle = [System.Windows.FontStyles]::Normal
-                }
+                # Import Exclusions
+                $hasProductSections = $productIds | Where-Object { $topLevelKeys -contains $_ }
 
-                if ($Config.OrgUnit) {
-                    $syncHash.OrgUnit_TextBox.Text = $Config.OrgUnit
-                    $syncHash.OrgUnit_TextBox.Foreground = [System.Windows.Media.Brushes]::Black
-                    $syncHash.OrgUnit_TextBox.FontStyle = [System.Windows.FontStyles]::Normal
-                }
+                if ($hasProductSections) {
+                    foreach ($productName in $productIds) {
+                        if ($topLevelKeys -contains $productName) {
+                            $productData = $Config.$productName
 
-                if ($Config.Description) {
-                    $syncHash.Description_TextBox.Text = $Config.Description
-                    $syncHash.Description_TextBox.Foreground = [System.Windows.Media.Brushes]::Black
-                    $syncHash.Description_TextBox.FontStyle = [System.Windows.FontStyles]::Normal
-                }
+                            # Get product exclusion keys
+                            $productKeys = if ($productData -is [hashtable]) { $productData.Keys } else { $productData.PSObject.Properties.Name }
 
-                # M365 Environment
-                if ($Config.M365Environment) {
-                    $envItem = $syncHash.UIConfigs.SupportedM365Environment | Where-Object { $_.id -eq $Config.M365Environment }
-                    if ($envItem) {
-                        $syncHash.EnvironmentComboBox.SelectedItem = $envItem.displayName
-                    }
-                }
+                            foreach ($policyId in $productKeys) {
+                                $policyData = $productData.$policyId
 
-                # Products
-                if ($Config.ProductNames) {
-                    # If ProductNames is a single wildcard '*', check all products
-                    $isWildcard = $false
-                    if ($Config.ProductNames -is [System.Collections.IEnumerable] -and $Config.ProductNames.Count -eq 1 -and $Config.ProductNames[0] -eq '*') {
-                        $isWildcard = $true
-                    } elseif ($Config.ProductNames -eq '*') {
-                        $isWildcard = $true
-                    }
-
-                    foreach ($item in $syncHash.ProductsGrid.Children) {
-                        if ($item -is [System.Windows.Controls.CheckBox] -and $item.Name -like "*ProductCheckBox") {
-                            if ($isWildcard) {
-                                $item.IsChecked = $true
-                            } else {
-                                # $Config.ProductNames may be a string or array
-                                if ($Config.ProductNames -is [System.Collections.IEnumerable]) {
-                                    $item.IsChecked = $Config.ProductNames -contains $item.Tag
-                                } else {
-                                    $item.IsChecked = ($Config.ProductNames -eq $item.Tag)
+                                # Find the exclusion type from baseline config
+                                $baseline = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
+                                if ($baseline -and $baseline.exclusionType -ne "none") {
+                                    $exclusion = [PSCustomObject]@{
+                                        Id = $policyId
+                                        Product = $productName
+                                        Data = $policyData
+                                        ExclusionType = $baseline.exclusionType
+                                    }
+                                    $syncHash.Exclusions += $exclusion
                                 }
                             }
                         }
                     }
                 }
 
-                # Advanced Tab - Application Section
-                if ($Config.AppId -or $Config.CertificateThumbprint) {
-                    $syncHash.ApplicationSectionToggle.IsChecked = $true
-                    $syncHash.ApplicationSectionContent.Visibility = [System.Windows.Visibility]::Visible
+                # Import Omissions
+                if ($topLevelKeys -contains "OmitPolicy") {
+                    $omissionKeys = if ($Config.OmitPolicy -is [hashtable]) { $Config.OmitPolicy.Keys } else { $Config.OmitPolicy.PSObject.Properties.Name }
 
-                    if ($Config.AppId) {
-                        $syncHash.AppId_TextBox.Text = $Config.AppId
+                    foreach ($policyId in $omissionKeys) {
+                        $omissionData = $Config.OmitPolicy.$policyId
+
+                        # Find which product this policy belongs to
+                        $productName = $null
+                        foreach ($product in $syncHash.UIConfigs.products) {
+                            $baseline = $syncHash.UIConfigs.baselines.($product.id) | Where-Object { $_.id -eq $policyId }
+                            if ($baseline) {
+                                $productName = $product.id
+                                break
+                            }
+                        }
+
+                        if ($productName) {
+                            $omission = [PSCustomObject]@{
+                                Id = $policyId
+                                Product = $productName
+                                Rationale = $omissionData.Rationale
+                                Expiration = $omissionData.Expiration
+                            }
+                            $syncHash.Omissions += $omission
+                        }
                     }
-
-                    if ($Config.CertificateThumbprint) {
-                        $syncHash.Certificate_TextBox.Text = $Config.CertificateThumbprint
-                    }
-                }
-
-                # Advanced Tab - Output Section
-                if ($Config.OutPath -or $Config.OutFolderName -or $Config.OutJsonFileName -or $Config.OutCsvFileName) {
-                    $syncHash.OutputSectionToggle.IsChecked = $true
-                    $syncHash.OutputSectionContent.Visibility = [System.Windows.Visibility]::Visible
-
-                    if ($Config.OutPath) {
-                        $syncHash.OutPath_TextBox.Text = $Config.OutPath
-                    }
-
-                    if ($Config.OutFolderName) {
-                        $syncHash.OutFolderName_TextBox.Text = $Config.OutFolderName
-                    }
-
-                    if ($Config.OutJsonFileName) {
-                        $syncHash.OutJsonFileName_TextBox.Text = $Config.OutJsonFileName
-                    }
-
-                    if ($Config.OutCsvFileName) {
-                        $syncHash.OutCsvFileName_TextBox.Text = $Config.OutCsvFileName
-                    }
-                }
-
-                # Advanced Tab - OPA Section
-                if ($Config.OPAPath) {
-                    $syncHash.OpaSectionToggle.IsChecked = $true
-                    $syncHash.OpaSectionContent.Visibility = [System.Windows.Visibility]::Visible
-                    $syncHash.OpaPath_TextBox.Text = $Config.OPAPath
-                }
-
-                # Advanced Tab - General Section
-                if ($Config.PSObject.Properties.Name -contains "LogIn" -or $Config.PSObject.Properties.Name -contains "DisconnectOnExit") {
-                    $syncHash.GeneralSectionToggle.IsChecked = $true
-                    $syncHash.GeneralSectionContent.Visibility = [System.Windows.Visibility]::Visible
-
-                    if ($Config.PSObject.Properties.Name -contains "LogIn") {
-                        $syncHash.LogInCheckBox.IsChecked = [System.Convert]::ToBoolean($Config.LogIn)
-                    }
-
-                    if ($Config.PSObject.Properties.Name -contains "DisconnectOnExit") {
-                        $syncHash.DisconnectOnExitCheckBox.IsChecked = [System.Convert]::ToBoolean($Config.DisconnectOnExit)
-                    }
-                }
-
-                # Initialize collections if they don't exist
-                if (-not $syncHash.Exclusions) { $syncHash.Exclusions = @() }
-                if (-not $syncHash.Omissions) { $syncHash.Omissions = @() }
-                if (-not $syncHash.Annotations) { $syncHash.Annotations = @() }
-
-                # Import Exclusions - Check dynamically for any product sections
-                $productIds = $syncHash.UIConfigs.products | Select-Object -ExpandProperty id
-
-                # Get top-level keys regardless of object type
-                $topLevelKeys = if ($Config -is [hashtable]) { $Config.Keys } else { $Config.PSObject.Properties.Name }
-                $hasProductSections = $productIds | Where-Object { $topLevelKeys -contains $_ }
-                
-                if ($hasProductSections) {
-                    Import-ExclusionsFromYaml -Config $Config
-                }
-
-               if ($topLevelKeys -contains "OmitPolicy") {
-                    Import-OmissionsFromYaml -Config $Config
                 }
 
                 # Import Annotations
                 if ($topLevelKeys -contains "AnnotatePolicy") {
-                    Import-AnnotationsFromYaml -Config $Config
-                }
+                    $annotationKeys = if ($Config.AnnotatePolicy -is [hashtable]) { $Config.AnnotatePolicy.Keys } else { $Config.AnnotatePolicy.PSObject.Properties.Name }
 
-                # Validate and enable preview if organization is valid
-                $syncHash.PreviewTab.IsEnabled = $true
+                    foreach ($policyId in $annotationKeys) {
+                        $annotationData = $Config.AnnotatePolicy.$policyId
 
-                # Force update the preview
-                New-YamlPreview
-
-            }
-            catch {
-                [System.Windows.MessageBox]::Show("Error populating form fields: $($_.Exception.Message)", "Import Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
-            }
-        }
-
-        # Helper function to import exclusions from YAML
-        Function Import-ExclusionsFromYaml {
-            param($Config)
-
-            try {
-                # Define product list
-                $products = $syncHash.UIConfigs.products | Select-Object -ExpandProperty id
-                
-                # Get top-level keys regardless of object type
-                $topLevelKeys = if ($Config -is [hashtable]) { $Config.Keys } else { $Config.PSObject.Properties.Name }
-
-                foreach ($productName in $products) {
-                    if ($topLevelKeys -contains $productName) {
-                        $productConfig = $Config.$productName
-                        
-                        # Get all baseline policies for this product
-                        $productBaselines = $syncHash.UIConfigs.baselines.$productName
-                        
-                        # Get product config keys
-                        $productKeys = if ($productConfig -is [hashtable]) { $productConfig.Keys } else { $productConfig.PSObject.Properties.Name }
-                        
-                        # Process each policy in the product config
-                        foreach ($policyId in $productKeys) {
-                            $policyData = $productConfig.$policyId
-                            
-                            # Find the baseline for this policy
-                            $baseline = $productBaselines | Where-Object { $_.id -eq $policyId }
+                        # Find which product this policy belongs to
+                        $productName = $null
+                        foreach ($product in $syncHash.UIConfigs.products) {
+                            $baseline = $syncHash.UIConfigs.baselines.($product.id) | Where-Object { $_.id -eq $policyId }
                             if ($baseline) {
-                                # Get exclusion type keys
-                                $exclusionKeys = if ($policyData -is [hashtable]) { $policyData.Keys } else { $policyData.PSObject.Properties.Name }
-                                
-                                foreach ($exclusionType in $exclusionKeys) {
-                                    $exclusionData = $policyData.$exclusionType
-                                    
-                                    # Create exclusion object
-                                    $exclusion = [PSCustomObject]@{
-                                        Id = $policyId
-                                        Product = $productName
-                                        TypeName = $exclusionType
-                                        Data = @{}
-                                    }
-                                    
-                                    # Get field keys
-                                    $fieldKeys = if ($exclusionData -is [hashtable]) { $exclusionData.Keys } else { $exclusionData.PSObject.Properties.Name }
-                                    
-                                    foreach ($fieldName in $fieldKeys) {
-                                        $exclusion.Data[$fieldName] = $exclusionData.$fieldName
-                                    }
-                                    
-                                    $syncHash.Exclusions += $exclusion
-                                    
-                                    # Update UI
-                                    Update-ExclusionCardUI -PolicyId $policyId -ProductName $productName -ExclusionData $exclusion.Data -ExclusionType $exclusionType
-                                }
+                                $productName = $product.id
+                                break
                             }
                         }
-                    }
-                }
-                
-                Write-Host "Imported $($syncHash.Exclusions.Count) exclusions" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "Error importing exclusions: $($_.Exception.Message)" -ForegroundColor Red
-            }
-        }
 
-        # Helper function to import omissions from YAML
-        Function Import-OmissionsFromYaml {
-            param($Config)
-
-            try {
-                # Get omission policy keys
-                $omissionKeys = if ($Config.OmitPolicy -is [hashtable]) { $Config.OmitPolicy.Keys } else { $Config.OmitPolicy.PSObject.Properties.Name }
-                
-                foreach ($policyId in $omissionKeys) {
-                    $omissionData = $Config.OmitPolicy.$policyId
-                    
-                    # Find which product this policy belongs to
-                    $productName = $null
-                    foreach ($product in $syncHash.UIConfigs.products) {
-                        $baseline = $syncHash.UIConfigs.baselines.($product.id) | Where-Object { $_.id -eq $policyId }
-                        if ($baseline) {
-                            $productName = $product.id
-                            break
-                        }
-                    }
-                    
-                    if ($productName) {
-                        # Create omission object
-                        $omission = [PSCustomObject]@{
-                            Id = $policyId
-                            Product = $productName
-                            Rationale = $omissionData.Rationale
-                            Expiration = $omissionData.Expiration
-                        }
-                        
-                        $syncHash.Omissions += $omission
-                        
-                        # Update UI - find and populate the omission card
-                        Update-OmissionCardUI -PolicyId $policyId -ProductName $productName -Rationale $omissionData.Rationale -Expiration $omissionData.Expiration
-                    }
-                }
-                
-                Write-Host "Imported $($syncHash.Omissions.Count) omissions" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "Error importing omissions: $($_.Exception.Message)" -ForegroundColor Red
-            }
-        }
-
-        # Helper function to import annotations from YAML
-        Function Import-AnnotationsFromYaml {
-            param($Config)
-
-            try {
-                # Get annotation policy keys
-                $annotationKeys = if ($Config.AnnotatePolicy -is [hashtable]) { $Config.AnnotatePolicy.Keys } else { $Config.AnnotatePolicy.PSObject.Properties.Name }
-                
-                foreach ($policyId in $annotationKeys) {
-                    $annotationData = $Config.AnnotatePolicy.$policyId
-                    
-                    # Find which product this policy belongs to
-                    $productName = $null
-                    foreach ($product in $syncHash.UIConfigs.products) {
-                        $baseline = $syncHash.UIConfigs.baselines.($product.id) | Where-Object { $_.id -eq $policyId }
-                        if ($baseline) {
-                            $productName = $product.id
-                            break
-                        }
-                    }
-                    
-                    if ($productName) {
-                        # Create annotation object
-                        $annotation = [PSCustomObject]@{
-                            Id = $policyId
-                            Product = $productName
-                            Comment = $annotationData.Comment
-                        }
-                        
-                        $syncHash.Annotations += $annotation
-                        
-                        # Update UI - find and populate the annotation card
-                        Update-AnnotationCardUI -PolicyId $policyId -ProductName $productName -Comment $annotationData.Comment
-                    }
-                }
-                
-                Write-Host "Imported $($syncHash.Annotations.Count) annotations" -ForegroundColor Green
-            }
-            catch {
-                Write-Host "Error importing annotations: $($_.Exception.Message)" -ForegroundColor Red
-            }
-        }
-
-        # Helper function to update exclusion card UI
-        Function Update-ExclusionCardUI {
-            param(
-                [string]$PolicyId,
-                [string]$ProductName,
-                [hashtable]$ExclusionData,
-                [string]$ExclusionType
-            )
-
-            try {
-                $policyIdWithUnderscores = $PolicyId.replace('.', '_')
-                
-                # Find the checkbox for this policy
-                $checkbox = $syncHash.Window.FindName($policyIdWithUnderscores + "_ExclusionCheckbox")
-                if ($checkbox) {
-                    # Check the checkbox and make it bold
-                    $checkbox.IsChecked = $true
-                    
-                    # Find the policy header and make it bold
-                    $policyHeader = $checkbox.Parent.Parent.Children[1].Children[0]
-                    $policyHeader.FontWeight = "Bold"
-                    
-                    # Find and show the remove button
-                    $removeButton = $syncHash.Window.FindName($policyIdWithUnderscores + "_RemoveExclusion")
-                    if ($removeButton) {
-                        $removeButton.Visibility = "Visible"
-                    }
-                    
-                    # Populate the exclusion fields
-                    foreach ($fieldName in $ExclusionData.Keys) {
-                        $fieldValue = $ExclusionData[$fieldName]
-                        $fieldControlName = $policyIdWithUnderscores + "_" + $ExclusionType + "_" + $fieldName
-                        
-                        # Find the field control
-                        $fieldControl = $syncHash.Window.FindName($fieldControlName)
-                        if ($fieldControl) {
-                            if ($fieldControl -is [System.Windows.Controls.TextBox]) {
-                                # Handle string fields
-                                $fieldControl.Text = $fieldValue
-                            } else {
-                                # Handle array fields - find the list container
-                                $listContainer = $syncHash.Window.FindName($fieldControlName + "_List")
-                                if ($listContainer -and $fieldValue -is [array]) {
-                                    # Clear existing items
-                                    $listContainer.Children.Clear()
-                                    
-                                    # Add each item
-                                    foreach ($item in $fieldValue) {
-                                        # Create item row
-                                        $itemRow = New-Object System.Windows.Controls.StackPanel
-                                        $itemRow.Orientation = "Horizontal"
-                                        $itemRow.Margin = "0,2,0,2"
-
-                                        $itemText = New-Object System.Windows.Controls.TextBlock
-                                        $itemText.Text = $item
-                                        $itemText.VerticalAlignment = "Center"
-                                        $itemText.Width = 250
-                                        $itemText.Margin = "0,0,8,0"
-
-                                        $removeButton = New-Object System.Windows.Controls.Button
-                                        $removeButton.Content = "Remove"
-                                        $removeButton.Width = 60
-                                        $removeButton.Height = 22
-                                        $removeButton.Background = [System.Windows.Media.Brushes]::Red
-                                        $removeButton.Foreground = [System.Windows.Media.Brushes]::White
-                                        $removeButton.BorderThickness = "0"
-                                        $removeButton.FontSize = 10
-
-                                        $removeButton.Add_Click({
-                                            $this.Parent.Parent.Children.Remove($this.Parent)
-                                        }.GetNewClosure())
-
-                                        [void]$itemRow.Children.Add($itemText)
-                                        [void]$itemRow.Children.Add($removeButton)
-                                        [void]$listContainer.Children.Add($itemRow)
-                                    }
-                                }
+                        if ($productName) {
+                            $annotation = [PSCustomObject]@{
+                                Id = $policyId
+                                Product = $productName
+                                Comment = $annotationData.Comment
                             }
+                            $syncHash.Annotations += $annotation
                         }
                     }
                 }
+
             }
             catch {
-                Write-Host "Error updating exclusion card UI for $PolicyId`: $($_.Exception.Message)" -ForegroundColor Red
-            }
-        }
-
-        # Helper function to update omission card UI
-        Function Update-OmissionCardUI {
-            param(
-                [string]$PolicyId,
-                [string]$ProductName,
-                [string]$Rationale,
-                [string]$Expiration
-            )
-
-            try {
-                $policyIdWithUnderscores = $PolicyId.replace('.', '_')
-                
-                # Find the checkbox for this policy
-                $checkbox = $syncHash.Window.FindName($policyIdWithUnderscores + "_OmissionCheckbox")
-                if ($checkbox) {
-                    # Check the checkbox and make it bold
-                    $checkbox.IsChecked = $true
-                    
-                    # Find the policy header and make it bold
-                    $policyHeader = $checkbox.Parent.Parent.Children[1].Children[0]
-                    $policyHeader.FontWeight = "Bold"
-                    
-                    # Find and show the remove button
-                    $removeButton = $syncHash.Window.FindName($policyIdWithUnderscores + "_RemoveOmission")
-                    if ($removeButton) {
-                        $removeButton.Visibility = "Visible"
-                    }
-                    
-                    # Populate the rationale field
-                    $rationaleTextBox = $syncHash.Window.FindName($policyIdWithUnderscores + "_Rationale_TextBox")
-                    if ($rationaleTextBox) {
-                        $rationaleTextBox.Text = $Rationale
-                    }
-                    
-                    # Populate the expiration field if provided
-                    if ($Expiration) {
-                        $expirationTextBox = $syncHash.Window.FindName($policyIdWithUnderscores + "_Expiration_TextBox")
-                        if ($expirationTextBox) {
-                            try {
-                                $expirationDate = [DateTime]::Parse($Expiration)
-                                $expirationTextBox.Text = $expirationDate.ToString("MM/dd/yyyy")
-                                $expirationTextBox.Foreground = [System.Windows.Media.Brushes]::Black
-                                $expirationTextBox.FontStyle = "Normal"
-                            }
-                            catch {
-                                $expirationTextBox.Text = $Expiration
-                                $expirationTextBox.Foreground = [System.Windows.Media.Brushes]::Black
-                                $expirationTextBox.FontStyle = "Normal"
-                            }
-                        }
-                    }
-                }
-            }
-            catch {
-                Write-Host "Error updating omission card UI for $PolicyId`: $($_.Exception.Message)" -ForegroundColor Red
-            }
-        }
-
-        # Helper function to update annotation card UI
-        Function Update-AnnotationCardUI {
-            param(
-                [string]$PolicyId,
-                [string]$ProductName,
-                [string]$Comment
-            )
-
-            try {
-                $policyIdWithUnderscores = $PolicyId.replace('.', '_')
-                
-                # Find the checkbox for this policy
-                $checkbox = $syncHash.Window.FindName($policyIdWithUnderscores + "_AnnotationCheckbox")
-                if ($checkbox) {
-                    # Check the checkbox and make it bold
-                    $checkbox.IsChecked = $true
-                    
-                    # Find the policy header and make it bold
-                    $policyHeader = $checkbox.Parent.Parent.Children[1].Children[0]
-                    $policyHeader.FontWeight = "Bold"
-                    
-                    # Find and show the remove button
-                    $removeButton = $syncHash.Window.FindName($policyIdWithUnderscores + "_RemoveAnnotation")
-                    if ($removeButton) {
-                        $removeButton.Visibility = "Visible"
-                    }
-                    
-                    # Populate the comment field
-                    $commentTextBox = $syncHash.Window.FindName($policyIdWithUnderscores + "_Comment_TextBox")
-                    if ($commentTextBox) {
-                        $commentTextBox.Text = $Comment
-                    }
-                }
-            }
-            catch {
-                Write-Host "Error updating annotation card UI for $PolicyId`: $($_.Exception.Message)" -ForegroundColor Red
+                Write-Output "Error importing data: $($_.Exception.Message)"
+                throw
             }
         }
 
         Function Reset-FormFields {
-            # Reset Tenane Name
-            $syncHash.Organization_TextBox.Text = $syncHash.UIConfigs.localePlaceholder.Organization_TextBox
-            $syncHash.Organization_TextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-            $syncHash.Organization_TextBox.FontStyle = [System.Windows.FontStyles]::Italic
-            $syncHash.Organization_TextBox.BorderBrush = [System.Windows.Media.Brushes]::Gray
-            $syncHash.Organization_TextBox.BorderThickness = "1"
+            # Reset core data structures
+            $syncHash.Exclusions = @()
+            $syncHash.Omissions = @()
+            $syncHash.Annotations = @()
+            $syncHash.GeneralSettings = @{}
 
-            # Reset Organization Name TextBox
-            $syncHash.OrgName_TextBox.Text = $syncHash.UIConfigs.localePlaceholder.OrgName_TextBox
-            $syncHash.OrgName_TextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-            $syncHash.OrgName_TextBox.FontStyle = [System.Windows.FontStyles]::Italic
-            $syncHash.OrgName_TextBox.BorderBrush = [System.Windows.Media.Brushes]::Gray
-            $syncHash.OrgName_TextBox.BorderThickness = "1"
+            # Dynamically reset all controls using configuration
+            $syncHash.GetEnumerator() | ForEach-Object {
+                $controlName = $_.Key
+                $control = $_.Value
 
-            # Reset Organization Unit
-            $syncHash.OrgUnit_TextBox.Text = $syncHash.OrgUnitPlaceholder
-            $syncHash.OrgUnit_TextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-            $syncHash.OrgUnit_TextBox.FontStyle = [System.Windows.FontStyles]::Italic
-
-            # Reset Description
-            $syncHash.Description_TextBox.Text = $syncHash.DescriptionPlaceholder
-            $syncHash.Description_TextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-            $syncHash.Description_TextBox.FontStyle = [System.Windows.FontStyles]::Italic
-
-            # Reset M365 Environment
-            $syncHash.EnvironmentComboBox.SelectedIndex = 0
-
-            # Uncheck all products
-            foreach ($item in $syncHash | Where-Object { $_.GetType().Name -eq 'CheckBox' }) {
-                $item.IsChecked = $false
+                if ($control -is [System.Windows.Controls.TextBox]) {
+                    # First check if there's a placeholder value
+                    if ($syncHash.UIConfigs.localePlaceholder.$controlName) {
+                        # Reset to placeholder value with placeholder styling
+                        $control.Text = $syncHash.UIConfigs.localePlaceholder.$controlName
+                        $control.Foreground = [System.Windows.Media.Brushes]::Gray
+                        $control.FontStyle = [System.Windows.FontStyles]::Italic
+                        $control.BorderBrush = [System.Windows.Media.Brushes]::Gray
+                        $control.BorderThickness = "1"
+                    }
+                    # Then check if there's a default value in defaultSettings
+                    elseif ($syncHash.UIConfigs.defaultAdvancedSettings.$controlName) {
+                        $control.Text = $syncHash.UIConfigs.defaultAdvancedSettings.$controlName
+                        $control.Foreground = [System.Windows.Media.Brushes]::Black
+                        $control.FontStyle = [System.Windows.FontStyles]::Normal
+                        $control.BorderBrush = [System.Windows.Media.Brushes]::Gray
+                        $control.BorderThickness = "1"
+                    }
+                    # Fallback for special cases not in config
+                    else {
+                        $control.Text = ""
+                        $control.Foreground = [System.Windows.Media.Brushes]::Black
+                        $control.FontStyle = [System.Windows.FontStyles]::Normal
+                        $control.BorderBrush = [System.Windows.Media.Brushes]::Gray
+                        $control.BorderThickness = "1"
+                    }
+                }
+                elseif ($control -is [System.Windows.Controls.CheckBox]) {
+                    # Check if there's a default value in defaultSettings
+                    if ($syncHash.UIConfigs.defaultAdvancedSettings.PSObject.Properties.Name -contains $controlName) {
+                        $control.IsChecked = $syncHash.UIConfigs.defaultAdvancedSettings.$controlName
+                    }
+                    # Fallback for controls not in config
+                    else {
+                        # Don't reset product checkboxes here - handle them separately
+                        if (-not $controlName.EndsWith('ProductCheckBox')) {
+                            $control.IsChecked = $false
+                        }
+                    }
+                }
             }
 
-            # Reset Advanced Tab fields
-            if ($syncHash.ApplicationSectionToggle) {
-                $syncHash.ApplicationSectionToggle.IsChecked = $false
-                $syncHash.ApplicationSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
-                #$syncHash.AppId_TextBox.Text = "Your Application ID"
-                #$syncHash.Certificate_TextBox.Text = "Certificate Thumbprint"
+            # Reset specific UI elements that need special handling
+
+            # Uncheck all product checkboxes
+            $allProductCheckboxes = $syncHash.ProductsGrid.Children | Where-Object {
+                $_ -is [System.Windows.Controls.CheckBox] -and $_.Name -like "*ProductCheckBox"
+            }
+            foreach ($checkbox in $allProductCheckboxes) {
+                $checkbox.IsChecked = $false
             }
 
-            if ($syncHash.OutputSectionToggle) {
-                $syncHash.OutputSectionToggle.IsChecked = $false
-                $syncHash.OutputSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
-                $syncHash.OutPath_TextBox.Text = "."
-                $syncHash.OutFolderName_TextBox.Text = "M365BaselineConformance"
-                $syncHash.OutJsonFileName_TextBox.Text = "ScubaResults"
-                $syncHash.OutCsvFileName_TextBox.Text = "ScubaResults"
+            # Reset M365 Environment to default
+            $syncHash.M365Environment_ComboBox.SelectedIndex = 0
+
+            # Reset Advanced Tab toggles (these control visibility, not data)
+            $toggleControls = @('ApplicationSection_Toggle', 'OutputSection_Toggle', 'OpaSection_Toggle', 'GeneralSection_Toggle')
+            foreach ($toggleName in $toggleControls) {
+                if ($syncHash.$toggleName) {
+                    $syncHash.$toggleName.IsChecked = $false
+                    $contentName = $toggleName.Replace('_Toggle', 'Content')
+                    if ($syncHash.$contentName) {
+                        $syncHash.$contentName.Visibility = [System.Windows.Visibility]::Collapsed
+                    }
+                }
             }
 
-            if ($syncHash.OpaSectionToggle) {
-                $syncHash.OpaSectionToggle.IsChecked = $false
-                $syncHash.OpaSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
-                $syncHash.OpaPath_TextBox.Text = "."
-            }
-
-            if ($syncHash.GeneralSectionToggle) {
-                $syncHash.GeneralSectionToggle.IsChecked = $false
-                $syncHash.GeneralSectionContent.Visibility = [System.Windows.Visibility]::Collapsed
-                $syncHash.LogInCheckBox.IsChecked = $true
-                $syncHash.DisconnectOnExitCheckBox.IsChecked = $false
-            }
+            # Mark data as changed to trigger UI update
+            Set-DataChanged
         }
 
         Function New-YamlPreview {
-            # Get selected values
-            $orgName = if ($syncHash.OrgName_TextBox.Text -ne $syncHash.UIConfigs.localePlaceholder.OrgName_TextBox) { $syncHash.OrgName_TextBox.Text } else { "" }
-            $orgUnit = if ($syncHash.OrgUnit_TextBox.Text -ne $syncHash.OrgUnitPlaceholder) { $syncHash.OrgUnit_TextBox.Text } else { "" }
-            $description = if ($syncHash.Description_TextBox.Text -ne $syncHash.DescriptionPlaceholder) { $syncHash.Description_TextBox.Text } else { "" }
-
-            #$selectedEnv = $syncHash.UIConfigs.SupportedM365Environment | Where-Object { $_.displayName -eq $syncHash.EnvironmentComboBox.SelectedItem } | Select-Object -ExpandProperty id
-            #grab tag
-            $selectedEnv = $syncHash.EnvironmentComboBox.SelectedItem.Tag
-
             # Generate YAML preview
             $yamlPreview = @()
             $yamlPreview += '# ScubaGear Configuration File'
             $yamlPreview += "`n# Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
             $yamlPreview += "`n`n# Organization Configuration"
-            $yamlPreview += "`nOrganization: $($syncHash.Organization_TextBox.Text)"
-            If($orgName){$yamlPreview += "`nOrgName: $orgName"}
-            If($orgUnit){$yamlPreview += "`nOrgUnit: $orgUnit"}
-            If($description){
-                # Use quoted string format instead of literal block scalar for better ConvertFrom-Yaml compatibility
-                $escapedDescription = $description.Replace('"', '""')
-                $yamlPreview += "`nDescription: `"$escapedDescription`""
+
+            # Process main settings in order of localePlaceholder keys
+            if ($syncHash.UIConfigs.localePlaceholder) {
+                foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
+                    $control = $syncHash.$placeholderKey
+                    if ($control -is [System.Windows.Controls.TextBox]) {
+                        $currentValue = $control.Text
+                        $placeholderValue = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
+
+                        # Only include if it's not empty and not a placeholder
+                        if (![string]::IsNullOrWhiteSpace($currentValue) -and $currentValue -ne $placeholderValue) {
+                            # Convert control name to YAML field name (remove _TextBox suffix)
+                            $yamlFieldName = $placeholderKey -replace '_TextBox$', ''
+
+                            # Handle special formatting for description
+                            if ($yamlFieldName -eq 'Description') {
+                                $escapedDescription = $currentValue.Replace('"', '""')
+                                $yamlPreview += "`n$yamlFieldName`: `"$escapedDescription`""
+                            } else {
+                                $yamlPreview += "`n$yamlFieldName`: $currentValue"
+                            }
+                        }
+                    }
+                }
             }
+
             $yamlPreview += "`n`n# Configuration Details"
 
+            # Handle ProductNames (existing logic)
             $selectedProducts = @()
             foreach ($item in $syncHash.ProductsGrid.Children) {
                 if ($item -is [System.Windows.Controls.CheckBox] -and
@@ -3365,93 +3211,64 @@ Function Invoke-SCuBAConfigAppUI {
             }
 
             if ($selectedProducts.Count -eq $allProductCheckboxes.Count -and $selectedProducts.Count -gt 0) {
-                # All products are selected, use wildcard
                 $yamlPreview += "`nProductNames: ['*']"
             } else {
-                # Not all products selected, list them individually
                 $yamlPreview += "`nProductNames:"
                 foreach ($product in $selectedProducts) {
                     $yamlPreview += "`n  - $product"
                 }
             }
 
+            # Handle M365Environment
+            #$selectedEnv = $syncHash.M365Environment_ComboBox.SelectedItem.Tag
+            $selectedEnv = $syncHash.UIConfigs.SupportedM365Environment | Where-Object { $_.id -eq $syncHash.M365Environment_ComboBox.SelectedItem.Tag } | Select-Object -ExpandProperty name
             $yamlPreview += "`n`nM365Environment: $selectedEnv"
 
-            # Check Advanced Tab sections and add them if toggled on
+            # Process advanced settings in order of defaultAdvancedSettings keys
+            if ($syncHash.UIConfigs.defaultAdvancedSettings) {
+                $hasAdvancedSettings = $false
+                $advancedSettingsContent = @()
 
-            # Application Section
-            if ($syncHash.ApplicationSectionToggle -and $syncHash.ApplicationSectionToggle.IsChecked) {
-                $yamlPreview += "`n`n# Application Configuration"
+                foreach ($advancedKey in $syncHash.UIConfigs.defaultAdvancedSettings.PSObject.Properties.Name) {
+                    $control = $syncHash.$advancedKey
+                    $defaultValue = $syncHash.UIConfigs.defaultAdvancedSettings.$advancedKey
 
-                # Add AppId if it's not empty and not placeholder
-                if (![string]::IsNullOrWhiteSpace($syncHash.AppId_TextBox.Text) -and
-                    $syncHash.AppId_TextBox.Text -ne "Your Application ID") {
-                    $yamlPreview += "`nAppId: $($syncHash.AppId_TextBox.Text)"
+                    if ($control -is [System.Windows.Controls.TextBox]) {
+                        $currentValue = $control.Text
+
+                        # Include if it has a value (use current value or default if empty)
+                        $valueToUse = if (![string]::IsNullOrWhiteSpace($currentValue)) { $currentValue } else { $defaultValue }
+
+                        if (![string]::IsNullOrWhiteSpace($valueToUse)) {
+                            # Convert control name to YAML field name (remove _TextBox suffix)
+                            $yamlFieldName = $advancedKey -replace '_TextBox$', ''
+
+                            # Handle path escaping
+                            if ($valueToUse -match '\\') {
+                                $advancedSettingsContent += "`n$yamlFieldName`: `"$($valueToUse.Replace('\', '\\'))`""
+                            } else {
+                                $advancedSettingsContent += "`n$yamlFieldName`: `"$valueToUse`""
+                            }
+                            $hasAdvancedSettings = $true
+                        }
+                    }
+                    elseif ($control -is [System.Windows.Controls.CheckBox]) {
+                        # Convert control name to YAML field name (remove _CheckBox suffix)
+                        $yamlFieldName = $advancedKey -replace '_CheckBox$', ''
+                        $boolValue = if ($control.IsChecked) { "true" } else { "false" }
+                        $advancedSettingsContent += "`n$yamlFieldName`: $boolValue"
+                        $hasAdvancedSettings = $true
+                    }
                 }
 
-                # Add Certificate if it's not empty and not placeholder
-                if (![string]::IsNullOrWhiteSpace($syncHash.Certificate_TextBox.Text) -and
-                    $syncHash.Certificate_TextBox.Text -ne "Certificate Thumbprint") {
-                    $yamlPreview += "`nCertificateThumbprint: $($syncHash.Certificate_TextBox.Text)"
+                # Only add advanced settings section if there are settings to show
+                if ($hasAdvancedSettings) {
+                    $yamlPreview += "`n`n# Advanced Configuration"
+                    $yamlPreview += $advancedSettingsContent
                 }
             }
 
-            # Output Section
-            if ($syncHash.OutputSectionToggle -and $syncHash.OutputSectionToggle.IsChecked) {
-                $yamlPreview += "`n`n# Output Configuration"
-
-                # Add OutPath (always include if section is toggled)
-                $outPath = if (![string]::IsNullOrWhiteSpace($syncHash.OutPath_TextBox.Text)) { $syncHash.OutPath_TextBox.Text } else { "." }
-                $yamlPreview += "`nOutPath: `"$($outPath.replace('\', '\\'))`""
-
-                # Add OutFolderName (always include if section is toggled)
-                $outFolderName = if (![string]::IsNullOrWhiteSpace($syncHash.OutFolderName_TextBox.Text)) { $syncHash.OutFolderName_TextBox.Text } else { "M365BaselineConformance" }
-                $yamlPreview += "`nOutFolderName: `"$outFolderName`""
-
-                # Add OutJsonFileName (always include if section is toggled)
-                $outJsonFileName = if (![string]::IsNullOrWhiteSpace($syncHash.OutJsonFileName_TextBox.Text)) { $syncHash.OutJsonFileName_TextBox.Text } else { "ScubaResults" }
-                $yamlPreview += "`nOutJsonFileName: `"$outJsonFileName`""
-
-                # Add OutCsvFileName (always include if section is toggled)
-                $outCsvFileName = if (![string]::IsNullOrWhiteSpace($syncHash.OutCsvFileName_TextBox.Text)) { $syncHash.OutCsvFileName_TextBox.Text } else { "ScubaResults" }
-                $yamlPreview += "`nOutCsvFileName: `"$outCsvFileName`""
-            }
-
-            # OPA Section
-            if ($syncHash.OpaSectionToggle -and $syncHash.OpaSectionToggle.IsChecked) {
-                $yamlPreview += "`n`n# OPA Configuration"
-
-                # Add OpaPath (always include if section is toggled)
-                $opaPath = if (![string]::IsNullOrWhiteSpace($syncHash.OpaPath_TextBox.Text)) { $syncHash.OpaPath_TextBox.Text } else { "." }
-                $yamlPreview += "`nOPAPath: `"$($opaPath.replace('\', '\\'))`""
-            }
-
-            # General Section
-            if ($syncHash.GeneralSectionToggle -and $syncHash.GeneralSectionToggle.IsChecked) {
-                $yamlPreview += "`n`n# General Configuration"
-
-                # Add LogIn setting (always include if section is toggled)
-                $logIn = if ($syncHash.LogInCheckBox.IsChecked) { "true" } else { "false" }
-                $yamlPreview += "`nLogIn: $logIn"
-
-                # Add DisconnectOnExit setting (always include if section is toggled)
-                $disconnectOnExit = if ($syncHash.DisconnectOnExitCheckBox.IsChecked) { "true" } else { "false" }
-                $yamlPreview += "`nDisconnectOnExit: $disconnectOnExit"
-            }
-
-
-            # list exclusions psobject
-            # members: Id, Product, TypeName, FieldName, FieldValue
-            <#
-            Aad: <-- Product
-            # Legacy authentication SHALL be blocked.: <--Description
-            MS.AAD.1.1v1: <-- Id
-                CapExclusions: <-- TypeName
-                Groups: <-- FieldName
-                    - a90c9846-7c79-4d90-a38a-6d4781106481 <-- FieldValue
-                Users: <-- FieldName
-                    - a90c9846-7c79-4d90-a38a-6d4781106481 <-- FieldValue
-            #>
+            # Handle Exclusions (existing logic)
             if ($syncHash.Exclusions.Count -gt 0) {
                 $yamlPreview += "`n`n# Policy Exclusions"
 
@@ -3519,26 +3336,26 @@ Function Invoke-SCuBAConfigAppUI {
                 }
             }
 
-            # Add annotations section after omissions
+            # Handle Annotations
             if ($syncHash.Annotations.Count -gt 0) {
                 $yamlPreview += "`n`nAnnotatePolicy:"
-                
+
                 # Group annotations by product
                 $syncHash.Annotations | Group-Object Product | ForEach-Object {
                     $product = $_.Name
                     $yamlPreview += "`n  # $product Annotations:"
-                    
+
                     foreach ($item in $_.Group | Sort-Object Id) {
                         # Get policy details from baselines
                         $policyInfo = $syncHash.UIConfigs.baselines.$product | Where-Object { $_.id -eq $item.Id }
-                        
+
                         if ($policyInfo) {
                             # Add policy comment with description
                             $yamlPreview += "`n  # $($policyInfo.name)"
                         }
-                        
+
                         $yamlPreview += "`n  $($item.Id):"
-                        
+
                         if ($item.Comment -match "`n") {
                             # Use quoted string format with \n for line breaks
                             $escapedComment = $item.Comment.Replace('"', '""').Replace("`n", "\n")
@@ -3550,23 +3367,24 @@ Function Invoke-SCuBAConfigAppUI {
                 }
             }
 
-            # list omissions psobject
-            # members: Id,Product,Rationale,Expiration
-            <#
-            OmitPolicy: <-- OmitPolicy
-            # Conditional access policies SHALL be enforced for all users.: <-- Description
-            MS.AAD.2.1v1: <-- Id
-                Rationale: I need this <-- Rationale
-                Expiration: 2025-07-15 <-- Expiration
-            #>
-            If($syncHash.Omissions.Count -gt 0) {
-                #group all omissions by product so they are in order
+            # Handle Omissions
+            if ($syncHash.Omissions.Count -gt 0) {
                 $yamlPreview += "`n`nOmitPolicy:"
-                #group all exclusions by product so they are in order
-                $syncHash.Omissions | Group-Object Product  | ForEach-Object {
+
+                # Group omissions by product
+                $syncHash.Omissions | Group-Object Product | ForEach-Object {
                     $product = $_.Name
-                    $yamlPreview += "`n  #$product Omissions:"
+                    $yamlPreview += "`n  # $product Omissions:"
+
                     foreach ($item in $_.Group | Sort-Object Id) {
+                        # Get policy details from baselines
+                        $policyInfo = $syncHash.UIConfigs.baselines.$product | Where-Object { $_.id -eq $item.Id }
+
+                        if ($policyInfo) {
+                            # Add policy comment with description
+                            $yamlPreview += "`n  # $($policyInfo.name)"
+                        }
+
                         $yamlPreview += "`n  $($item.Id):"
                         $yamlPreview += "`n    Rationale: $($item.Rationale)"
                         if ($item.Expiration) {
@@ -3574,7 +3392,6 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                 }
-
             }
 
             # Display in preview tab
@@ -3585,31 +3402,6 @@ Function Invoke-SCuBAConfigAppUI {
                     $syncHash.MainTabControl.SelectedItem = $syncHash.PreviewTab
                     break
                 }
-            }
-        }
-
-
-        if ($syncHash.YAMLImport) {
-            try {
-                Write-Verbose "Loading YAML configuration from: $($syncHash.YAMLImport)"
-
-                # Check if file exists
-                if (Test-Path -Path $syncHash.YAMLImport -PathType Leaf) {
-                    $yamlContent = Get-Content -Path $syncHash.YAMLImport -Raw
-                    $yamlObject = $yamlContent | ConvertFrom-Yaml
-
-                    # Import and populate all form fields
-                    Import-YamlConfiguration -Config $yamlObject
-
-                    Write-Verbose "YAML configuration loaded successfully"
-                } else {
-                    Write-Warning "YAML configuration file not found: $($syncHash.YAMLImport)"
-                }
-            }
-            catch {
-                Write-Warning "Error loading YAML configuration file: $($_.Exception.Message)"
-                # Don't show message box on startup errors - just log the warning
-                # The UI will still open with default values
             }
         }
 
@@ -3625,10 +3417,18 @@ Function Invoke-SCuBAConfigAppUI {
         #Add smooth closing for Window
         $syncHash.Window.Add_Loaded({ $syncHash.isLoaded = $True })
     	$syncHash.Window.Add_Closing({ $syncHash.isClosing = $True; Close-UIMainWindow})
-    	$syncHash.Window.Add_Closed({ $syncHash.isClosed = $True })
+    	$syncHash.Window.Add_Closed({
+            if ($syncHash.UIUpdateTimer) {
+                $syncHash.UIUpdateTimer.Stop()
+                $syncHash.UIUpdateTimer = $null
+            }
+            $syncHash.isClosed = $True
+        })
 
         #always force windows on bottom
         $syncHash.Window.Topmost = $True
+
+        $syncHash.UIUpdateTimer.Start()
 
         #Allow UI to be dragged around screen
         <#
@@ -3675,7 +3475,13 @@ Function Invoke-SCuBAConfigAppUI {
 Invoke-SCuBAConfigAppUI
 
 #UI functions used within runspace
-Close-UIMainWindow
+
+Set-DataChanged
+Update-AllUIFromData
+Update-ExclusionsFromData
+Update-OmissionsFromData
+Update-AnnotationsFromData
+Update-GeneralSettingsFromData
 
 Show-UISelectionWindow
 Show-GraphProgressWindow
@@ -3691,13 +3497,7 @@ New-OmissionCard
 New-ProductAnnotations
 New-AnnotationCard
 
-Import-ExclusionsFromYaml
-Import-OmissionsFromYaml
-Import-AnnotationsFromYaml
-Update-ExclusionCardUI
-Update-OmissionCardUI
-Update-AnnotationCardUI
-Import-YamlConfiguration
+
 
 Show-GroupSelector
 Show-UserSelector
@@ -3705,4 +3505,7 @@ Confirm-UIField
 
 Reset-FormFields
 New-YamlPreview
+
+Close-UIMainWindow
+
 #>

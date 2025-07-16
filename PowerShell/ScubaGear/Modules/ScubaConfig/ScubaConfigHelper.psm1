@@ -20,7 +20,7 @@ function Get-ScubaConfigRegoExclusionMappings {
     )
 
     $exclusionMappings = @{}
-    
+
     # Define the mapping patterns to look for in Rego files
     <#
     $patterns = @{
@@ -28,7 +28,7 @@ function Get-ScubaConfigRegoExclusionMappings {
         'UserExclusionsFullyExempt.*["\']([^"\']+)["\']' = 'capolicy'
         'GroupExclusionsFullyExempt.*["\']([^"\']+)["\']' = 'capolicy'
         'PrivilegedRoleExclusions.*["\']([^"\']+)["\']' = 'role'
-        
+
         # Defender Patterns
         'SensitiveAccountsConfig.*["\']([^"\']+)["\']' = 'sensitiveAccounts'
         'SensitiveAccountsSetting.*["\']([^"\']+)["\']' = 'sensitiveAccounts'
@@ -36,10 +36,10 @@ function Get-ScubaConfigRegoExclusionMappings {
         'ImpersonationProtectionConfig.*["\']([^"\']+)["\'].*["\']PartnerDomains["\']' = 'partnerDomains'
         'ImpersonationProtectionConfig.*["\']([^"\']+)["\'].*["\']SensitiveUsers["\']' = 'sensitiveUsers'
         'ImpersonationProtectionConfig.*["\']([^"\']+)["\']' = 'sensitiveUsers'  # Default for impersonation
-        
+
         # EXO Patterns
         'input\.scuba_config\.Exo\[["\']([^"\']+)["\']\]\.AllowedForwardingDomains' = 'forwardingDomains'
-        
+
         # General scuba_config patterns
         'input\.scuba_config\.Aad\[["\']([^"\']+)["\']\]\.CapExclusions' = 'capolicy'
         'input\.scuba_config\.Aad\[["\']([^"\']+)["\']\]\.RoleExclusions' = 'role'
@@ -54,7 +54,7 @@ function Get-ScubaConfigRegoExclusionMappings {
         'UserExclusionsFullyExempt.*["'']([^"'']+)["'']' = 'capolicy'
         'GroupExclusionsFullyExempt.*["'']([^"'']+)["'']' = 'capolicy'
         'PrivilegedRoleExclusions.*["'']([^"'']+)["'']' = 'role'
-        
+
         'SensitiveAccountsConfig.*["'']([^"'']+)["'']' = 'sensitiveAccounts'
         'SensitiveAccountsSetting.*["'']([^"'']+)["'']' = 'sensitiveAccounts'
         'ImpersonationProtectionConfig.*["'']([^"'']+)["''].*["'']AgencyDomains["'']' = 'agencyDomains'
@@ -63,7 +63,7 @@ function Get-ScubaConfigRegoExclusionMappings {
         'ImpersonationProtectionConfig.*["'']([^"'']+)["'']' = 'sensitiveUsers'
 
         'input\.scuba_config\.Exo\[\''([^'']+)\''\]\.AllowedForwardingDomains' = 'forwardingDomains'
-        
+
         'input\.scuba_config\.Aad\[\''([^'']+)\''\]\.CapExclusions' = 'capolicy'
         'input\.scuba_config\.Aad\[\''([^'']+)\''\]\.RoleExclusions' = 'role'
         'input\.scuba_config\.Defender\[\''([^'']+)\''\]\.SensitiveAccounts' = 'sensitiveAccounts'
@@ -78,20 +78,17 @@ function Get-ScubaConfigRegoExclusionMappings {
 
     foreach ($file in $regoFiles) {
         $content = Get-Content -Path $file.FullName -Raw
-        
-        # Extract product from filename
-        $product = $file.BaseName.Replace('Config', '').ToLower()
-        
+
         foreach ($pattern in $patterns.Keys) {
             $exclusionType = $patterns[$pattern]
-            
+
             # Use regex to find matches
             $matches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-            
+
             foreach ($match in $matches) {
                 if ($match.Groups.Count -gt 1) {
                     $policyId = $match.Groups[1].Value
-                    
+
                     # Only add if it looks like a valid policy ID
                     if ($policyId -match '^MS\.[A-Z]+\.[0-9]+\.[0-9]+v[0-9]+$') {
                         $exclusionMappings[$policyId] = $exclusionType
@@ -105,56 +102,56 @@ function Get-ScubaConfigRegoExclusionMappings {
     # Add some additional patterns by analyzing comments and function names
     foreach ($file in $regoFiles) {
         $content = Get-Content -Path $file.FullName
-        
+
         $currentPolicyId = $null
         $inPolicySection = $false
-        
+
         for ($i = 0; $i -lt $content.Count; $i++) {
             $line = $content[$i]
-            
+
             # Look for policy ID comments
             if ($line -match '#\s*(MS\.[A-Z]+\.[0-9]+\.[0-9]+v[0-9]+)') {
                 $currentPolicyId = $matches[1]
                 $inPolicySection = $true
                 continue
             }
-            
+
             # Look for end of policy section
             if ($inPolicySection -and $line -match '^#\s*MS\.[A-Z]+\.[0-9]+' -and $line -notmatch $currentPolicyId) {
                 $inPolicySection = $false
                 $currentPolicyId = $null
                 continue
             }
-            
+
             # If we're in a policy section, look for specific patterns
             if ($inPolicySection -and $currentPolicyId) {
                 # Look for specific exclusion patterns within the policy section
                 switch -Regex ($line) {
-                    'UserExclusionsFullyExempt|GroupExclusionsFullyExempt' { 
+                    'UserExclusionsFullyExempt|GroupExclusionsFullyExempt' {
                         $exclusionMappings[$currentPolicyId] = 'capolicy'
                         Write-Verbose "Found CAP mapping: $currentPolicyId -> capolicy (from context)"
                     }
-                    'PrivilegedRoleExclusions' { 
+                    'PrivilegedRoleExclusions' {
                         $exclusionMappings[$currentPolicyId] = 'role'
                         Write-Verbose "Found role mapping: $currentPolicyId -> role (from context)"
                     }
-                    'SensitiveAccountsConfig|SensitiveAccountsSetting' { 
+                    'SensitiveAccountsConfig|SensitiveAccountsSetting' {
                         $exclusionMappings[$currentPolicyId] = 'sensitiveAccounts'
                         Write-Verbose "Found sensitive accounts mapping: $currentPolicyId -> sensitiveAccounts (from context)"
                     }
-                    'ImpersonationProtectionConfig.*SensitiveUsers' { 
+                    'ImpersonationProtectionConfig.*SensitiveUsers' {
                         $exclusionMappings[$currentPolicyId] = 'sensitiveUsers'
                         Write-Verbose "Found sensitive users mapping: $currentPolicyId -> sensitiveUsers (from context)"
                     }
-                    'ImpersonationProtectionConfig.*PartnerDomains' { 
+                    'ImpersonationProtectionConfig.*PartnerDomains' {
                         $exclusionMappings[$currentPolicyId] = 'partnerDomains'
                         Write-Verbose "Found partner domains mapping: $currentPolicyId -> partnerDomains (from context)"
                     }
-                    'ImpersonationProtectionConfig.*AgencyDomains' { 
+                    'ImpersonationProtectionConfig.*AgencyDomains' {
                         $exclusionMappings[$currentPolicyId] = 'agencyDomains'
                         Write-Verbose "Found agency domains mapping: $currentPolicyId -> agencyDomains (from context)"
                     }
-                    'AllowedForwardingDomains' { 
+                    'AllowedForwardingDomains' {
                         $exclusionMappings[$currentPolicyId] = 'forwardingDomains'
                         Write-Verbose "Found forwarding domains mapping: $currentPolicyId -> forwardingDomains (from context)"
                     }
@@ -217,10 +214,10 @@ function Update-ScubaConfigBaselineWithRego {
     )
 
     # Get the exclusion mappings from Rego files
-    Write-Host "Analyzing Rego files for exclusion mappings..." -ForegroundColor Yellow
+    Write-Output "Analyzing Rego files for exclusion mappings..."
     $regoMappings = Get-ScubaConfigRegoExclusionMappings -RegoDirectory $RegoDirectory
 
-    Write-Host "Found $($regoMappings.Keys.Count) policy exclusion mappings from Rego files" -ForegroundColor Green
+    Write-Output "Found $($regoMappings.Keys.Count) policy exclusion mappings from Rego files"
 
     # Load existing configuration
     if (-not (Test-Path $ConfigFilePath)) {
@@ -319,21 +316,21 @@ function Update-ScubaConfigBaselineWithRego {
     $jsonOutput = $configContent | ConvertTo-Json -Depth 10
     $jsonOutput | Set-Content $ConfigFilePath -Encoding UTF8
 
-    Write-Host "Successfully updated baselines in configuration file: $ConfigFilePath" -ForegroundColor Green
-    Write-Host "Updated products: $($newBaselines.Keys -join ', ')" -ForegroundColor Yellow
-    
+    Write-Output "Successfully updated baselines in configuration file: $ConfigFilePath"
+    Write-Output "Updated products: $($newBaselines.Keys -join ', ')"
+
     # Show exclusion type statistics
-    Write-Host "`nExclusion Type Statistics:" -ForegroundColor Cyan
+    Write-Output "`nExclusion Type Statistics:"
     foreach ($exclusionType in ($mappingStats.Keys | Sort-Object)) {
-        Write-Host "  $exclusionType`: $($mappingStats[$exclusionType]) policies" -ForegroundColor White
+        Write-Output "  $exclusionType`: $($mappingStats[$exclusionType]) policies"
     }
-    
+
     # Detailed summary
     foreach ($product in $newBaselines.Keys) {
         $policies = $newBaselines[$product]
         $policyCount = $policies.Count
         $exclusionCounts = $policies | Group-Object exclusionType | ForEach-Object { "$($_.Name): $($_.Count)" }
-        Write-Host "  $product`: $policyCount policies ($($exclusionCounts -join ', '))" -ForegroundColor Cyan
+        Write-Output "  $product`: $policyCount policies ($($exclusionCounts -join ', '))"
     }
 
     return $newBaselines
@@ -349,7 +346,7 @@ function Get-ScubaBaselinePolicy {
         [string]$GitHubDirectoryUrl
     )
 
-    
+
 
     $policyHeaderPattern = '^####\s+([A-Z0-9\.]+v\d+)\s*$'
     $policiesByProduct = @{}

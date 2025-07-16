@@ -13,7 +13,23 @@
     "Organization_TextBox" : "Enter tenant name (e.g., example.onmicrosoft.com)",
     "OrgName_TextBox" : "Enter organization name",
     "OrgUnit_TextBox" : "Enter organizational unit (optional)",
-    "Description_TextBox" : "Enter a description for this configuration (optional)"
+    "Description_TextBox" : "Enter a description for this configuration (optional)",
+    "AppId_TextBox" : "Enter Application ID (GUID format)",
+    "CertificateThumbprint_TextBox" : "Enter Certificate Thumbprint (40 hexadecimal)"
+  },
+  "defaultAdvancedSettings": {
+    "OutPath_TextBox" : ".",
+    "OutFolderName_TextBox" : "M365BaselineConformance",
+    "OutProviderFileName_TextBox" : "ProviderSettingsExport",
+    "OutRegoFileName_TextBox" : "TestResults",
+    "OutReportName_TextBox" : "BaselineReports",
+    "OutJsonFileName_TextBox" : "ScubaResults",
+    "OutCsvFileName_TextBox" : "ScubaResults",
+    "OutActionPlanFileName_TextBox" : "ActionPlan",
+    "OutReportsName_TextBox" : "ScubaReports",
+    "OpaPath_TextBox" : ".",
+    "LogIn_CheckBox" : true,
+    "DisconnectOnExit_CheckBox" : false
   },
   "localeInfoMessages": {
     "NewSessionConfirmation": "Are you sure you want to start a new session? This will clear all current selections and configurations.",
@@ -71,25 +87,25 @@
   "SupportedM365Environment": [
     {
       "id": "commercial",
-      "name": "Public",
+      "name": "commercial",
       "displayName": "Commercial",
       "rationale": "Production environment for public tenants."
     },
     {
       "id": "gcc",
-      "name": "GCC",
+      "name": "gcc",
       "displayName": "Government Community Cloud",
       "rationale": "Production environment for government tenants."
     },
     {
-      "id": "gcch",
-      "name": "GCCH",
+      "id": "gcchigh",
+      "name": "gcch",
       "displayName": "Government Community Cloud High",
       "rationale": "Production environment for GCCH tenants."
     },
     {
       "id": "dod",
-      "name": "DOD",
+      "name": "dod",
       "displayName": "Department of Defense",
       "rationale": "Production environment for DOD tenants."
     }

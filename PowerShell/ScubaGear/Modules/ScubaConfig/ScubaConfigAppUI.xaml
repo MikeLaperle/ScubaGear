@@ -385,7 +385,7 @@
                                     <!-- M365 Environment -->
                                     <StackPanel Margin="0,0,0,16">
                                         <TextBlock x:Name="Environment_TextBlock" Text="M365 Environment" FontWeight="Medium" Margin="0,0,0,4"/>
-                                        <ComboBox x:Name="EnvironmentComboBox" Width="380" HorizontalAlignment="Left"/>
+                                        <ComboBox x:Name="M365Environment_ComboBox" Width="380" HorizontalAlignment="Left"/>
                                     </StackPanel>
 
                                     <!-- Products -->
@@ -566,9 +566,9 @@
                                         FontWeight="SemiBold"
                                         Foreground="{StaticResource PrimaryBrush}"
                                         Margin="0,0,0,8"/>
-                                <TextBlock x:Name="AnnotationsTabInfo_TextBlock" 
+                                <TextBlock x:Name="AnnotationsTabInfo_TextBlock"
                                         Text="Add comments and annotations to policies for documentation and tracking purposes. Products must be selected on the main page before configuring annotations."
-                                        TextWrapping="Wrap" 
+                                        TextWrapping="Wrap"
                                         Foreground="{StaticResource MutedTextBrush}"/>
                             </StackPanel>
                         </Border>
@@ -670,7 +670,7 @@
                         </TabControl>
                     </Grid>
                 </TabItem>
-                
+
                 <!-- Omit Policy Tab -->
                 <TabItem x:Name="OmitPolicyTab" Header="Omit Policy">
                     <Grid>
@@ -801,7 +801,7 @@
                                     <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                                <CheckBox x:Name="ApplicationSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <CheckBox x:Name="ApplicationSection_Toggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
                                                 <TextBlock Text="Application Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
@@ -812,7 +812,7 @@
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="Certificate:" Width="120" VerticalAlignment="Center"/>
-                                                    <TextBox x:Name="Certificate_TextBox" MinWidth="300" Width="Auto"/>
+                                                    <TextBox x:Name="CertificateThumbprint_TextBox" MinWidth="300" Width="Auto"/>
                                                     <Button x:Name="SelectCertificateButton" Content="Select..." Style="{StaticResource SecondaryButton}" Width="70" Height="24" Margin="8,0,0,0"/>
                                                 </StackPanel>
                                             </StackPanel>
@@ -823,7 +823,7 @@
                                     <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                                <CheckBox x:Name="OutputSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <CheckBox x:Name="OutputSection_Toggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
                                                 <TextBlock Text="Output Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
@@ -839,12 +839,28 @@
                                                     <TextBox x:Name="OutFolderName_TextBox" Width="300" Text="M365BaselineConformance"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                    <TextBlock Text="JSON File:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="Provider FileName:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutProviderFileName_TextBox" Width="300" Text="ProviderSettingsExport"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="Rego FileName:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutRegoFileName_TextBox" Width="300" Text="TestResults"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="Report Name:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutReportName_TextBox" Width="300" Text="BaselineReports"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="JSON FileName:" Width="120" VerticalAlignment="Center"/>
                                                     <TextBox x:Name="OutJsonFileName_TextBox" Width="300" Text="ScubaResults"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                    <TextBlock Text="CSV File:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="CSV FileName:" Width="120" VerticalAlignment="Center"/>
                                                     <TextBox x:Name="OutCsvFileName_TextBox" Width="300" Text="ScubaResults"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                                    <TextBlock Text="Action Plan FileName:" Width="120" VerticalAlignment="Center"/>
+                                                    <TextBox x:Name="OutActionPlanFileName_TextBox" Width="300" Text="ActionPlan"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -854,7 +870,7 @@
                                     <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                                <CheckBox x:Name="OpaSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <CheckBox x:Name="OpaSection_Toggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
                                                 <TextBlock Text="OPA Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
@@ -873,16 +889,16 @@
                                     <Border BorderThickness="1" BorderBrush="{StaticResource BorderBrush}" CornerRadius="4" Padding="16" Margin="0,0,0,16">
                                         <StackPanel>
                                             <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                                <CheckBox x:Name="GeneralSectionToggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
+                                                <CheckBox x:Name="GeneralSection_Toggle" Style="{StaticResource ToggleSwitch}" Margin="0,0,8,0"/>
                                                 <TextBlock Text="General Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
                                             <StackPanel x:Name="GeneralSectionContent" Visibility="Collapsed">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                    <CheckBox x:Name="LogInCheckBox" Content="Login Required" IsChecked="True"/>
+                                                    <CheckBox x:Name="LogIn_CheckBox" Content="Login Required" IsChecked="True"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                                    <CheckBox x:Name="DisconnectOnExitCheckBox" Content="Disconnect on Exit"/>
+                                                    <CheckBox x:Name="DisconnectOnExit_CheckBox" Content="Disconnect on Exit"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -902,7 +918,7 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            
+
                             <Border Grid.Row="0" Style="{StaticResource Card}">
                                 <StackPanel>
                                     <TextBlock Text="YAML Preview"
@@ -912,7 +928,7 @@
                                     <TextBlock x:Name="PreviewTabInfo_TextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
                                 </StackPanel>
                             </Border>
-                            
+
                             <Border Grid.Row="1" >
                                 <StackPanel Margin="0,16,0,0">
                                     <TextBox x:Name="YamlPreview_TextBox"

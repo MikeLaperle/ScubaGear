@@ -6,7 +6,7 @@ OrgUnitName: Subdepartment of Example
 # The Description field is used to provide a detailed description of the configuration file.
 Description: |
   SCuBAGear YAML Configuration file
-  Any exemptions and their risks should be carefully considered and 
+  Any exemptions and their risks should be carefully considered and
   documented as part of an organization's cybersecurity risk management program process and practices.
   In order to pass/omit certain policy checks made during a ScubaGear assessment run, necessary action
   is required to provide specific values unique to both your organization and M365 tenant in the fields below.
@@ -183,6 +183,11 @@ Defender:
     PartnerDomains:
       - random.mail.example.com
 
+AnnotatePolicy:
+  # Users detected as high risk SHALL be blocked.
+  MS.AAD.2.1v1:
+    Comment: "This policy is used to block users detected as high risk. The organization has a process in place to review and unblock users if necessary."
+
 # ============================
 # OMIT SECTION : OMIT POLICIES
 # ============================
@@ -256,4 +261,3 @@ OmitPolicy:
   # A list of apps that are restricted from accessing files protected by DLP policy SHOULD be defined.
   MS.DEFENDER.4.5v1:
     Rationale: *DLPRationale
-
