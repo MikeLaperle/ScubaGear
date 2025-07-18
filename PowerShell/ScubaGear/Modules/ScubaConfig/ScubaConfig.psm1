@@ -399,14 +399,14 @@ Function Invoke-SCuBAConfigAppUI {
                 [string]$Source = "General",
                 [string]$Level = "Info"
             )
-            
+
             if ($syncHash.DebugEnabled) {
                 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
                 $logEntry = "[$timestamp] [$Level] [$Source] $Message"
-                
+
                 # Add to collection (thread-safe)
                 $syncHash.DebugOutput.Add($logEntry)
-                
+
                 # Update UI on dispatcher thread
                 if ($syncHash.Window -and $syncHash.Debug_TextBox) {
                     $syncHash.Window.Dispatcher.Invoke([action]{
@@ -416,10 +416,10 @@ Function Invoke-SCuBAConfigAppUI {
                                 $syncHash.Debug_TextBox.Text += "`r`n"
                             }
                             $syncHash.Debug_TextBox.Text += $logEntry
-                            
+
                             # Auto-scroll to bottom
                             $syncHash.Debug_TextBox.ScrollToEnd()
-                            
+
                             # Limit the number of lines to prevent memory issues (keep last 1000 lines)
                             $lines = $syncHash.Debug_TextBox.Text -split "`r`n"
                             if ($lines.Count -gt 1000) {
@@ -651,7 +651,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $selectedProducts += $checkbox.Tag
                 }
             }
-            
+
             # Update the GeneralSettings
             if ($selectedProducts.Count -gt 0) {
                 $syncHash.GeneralSettings["ProductNames"] = $selectedProducts
@@ -659,7 +659,7 @@ Function Invoke-SCuBAConfigAppUI {
                 # Remove ProductNames if no products are selected
                 $syncHash.GeneralSettings.Remove("ProductNames")
             }
-            
+
             Write-DebugOutput -Message "Updated ProductNames: [$($selectedProducts -join ', ')]" -Source $MyInvocation.MyCommand.Name -Level "Info"
         }
         #===========================================================================
@@ -951,25 +951,25 @@ Function Invoke-SCuBAConfigAppUI {
                     # Set bulk update flag to prevent event cascades
                     $syncHash.BulkUpdateInProgress = $true
 
-                    
+
                     # Uncheck all first - add type checking for safety
-                    foreach ($checkbox in $allProductCheckboxes) {    
+                    foreach ($checkbox in $allProductCheckboxes) {
                         $checkbox.IsChecked = $false
-                        
+
                     }
 
                     # Check the specific products
                     foreach ($productName in $syncHash.GeneralSettings.ProductNames) {
                         $checkbox = $allProductCheckboxes | Where-Object { $_.Tag -eq $productName }
-                        
+
                         $checkbox.IsChecked = $true
-                        
+
                     }
-                    
+
                     # Clear bulk update flag
                     $syncHash.BulkUpdateInProgress = $false
 
-                    
+
                 }
 
                 # If this is for YAML output and all products are selected, return '*'
@@ -3144,7 +3144,7 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                 }
-                Write-DebugOutput -Message "Reset control: $controlName" -Source $MyInvocation.MyCommand.Name -Level "Info" 
+                Write-DebugOutput -Message "Reset control: $controlName" -Source $MyInvocation.MyCommand.Name -Level "Info"
             }
 
             # Reset specific UI elements that need special handling
@@ -3427,7 +3427,7 @@ Function Invoke-SCuBAConfigAppUI {
                 $product = $product  # Capture the product reference
 
                 $syncHash.Window.Dispatcher.Invoke([action]{
-                   
+
                     <# # Skip if bulk update is in progress
                     if ($syncHash.BulkUpdateInProgress) {
                         return
@@ -3452,7 +3452,7 @@ Function Invoke-SCuBAConfigAppUI {
                     }else {
                         $checkbox.IsChecked = $false
                         Write-DebugOutput -Message "Product name was unchecked: [$($product.id)]" -Source "Action" -Level "Info"
-                        
+
                         # UPDATE PRODUCTNAMES IN REAL-TIME
                         Update-ProductNames
                         <#
@@ -3469,9 +3469,9 @@ Function Invoke-SCuBAConfigAppUI {
                             $syncHash.GeneralSettings.Remove("ProductNames")
                         }
                         Write-DebugOutput -Message "Updated ProductNames: [$($selectedProducts -join ', ')]" -Source "Checkbox Event" -Level "Info"
-                        
+
                         #>
-                        
+
                         # Disable tabs for this product
                         $OmissionTab = $syncHash.("$($product.id)OmissionTab")
                         $AnnotationTab = $syncHash.("$($product.id)AnnotationTab")
@@ -3482,7 +3482,7 @@ Function Invoke-SCuBAConfigAppUI {
                             $ExclusionsTab.IsEnabled = $false
                         }
                     }
-                    
+
 
                 }.GetNewClosure())
             }.GetNewClosure())
