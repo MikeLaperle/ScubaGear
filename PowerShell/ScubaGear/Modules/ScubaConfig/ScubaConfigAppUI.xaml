@@ -240,6 +240,48 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SubTabItemStyle" TargetType="TabItem">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="FontWeight" Value="Medium"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="0,0,0,2"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="ContentSite"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            ContentSource="Header"
+                                            Margin="0,0,0,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Panel.ZIndex" Value="100"/>
+                                <Setter TargetName="Bd" Property="Background" Value="White"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
+                            </Trigger>
+                            <!-- Add this trigger for disabled state -->
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#AAAAAA"/>
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Tab Button Style -->
         <Style TargetType="RadioButton" x:Key="TabButton">
             <Setter Property="Template">
@@ -391,19 +433,6 @@
                                     <!-- Products -->
                                     <StackPanel Margin="0,0,0,16">
                                         <TextBlock x:Name="Products_TextBlock" Text="Products" FontWeight="Medium" Margin="0,0,0,4"/>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                            <Button x:Name="SelectAllButton"
-                                                Style="{StaticResource SecondaryButton}"
-                                                Content="Select All"
-                                                Width="100"
-                                                HorizontalAlignment="Left"/>
-                                            <TextBlock x:Name="WildcardText"
-                                                   Text="Will generate as ProductNames: ['*']"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   VerticalAlignment="Center"
-                                                   Margin="12,0,0,0"
-                                                   Visibility="Collapsed"/>
-                                        </StackPanel>
 
                                         <Grid x:Name="ProductsGrid">
                                             <Grid.ColumnDefinitions>
@@ -454,42 +483,7 @@
                         <!-- Nested Tab Control for Products -->
                         <TabControl x:Name="ExclusionProductTabControl" Grid.Row="1">
                             <TabControl.Resources>
-                                <Style TargetType="TabItem">
-                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                    <Setter Property="FontWeight" Value="Medium"/>
-                                    <Setter Property="Padding" Value="12,6"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="TabItem">
-                                                <Border x:Name="Bd"
-                                                        Background="{TemplateBinding Background}"
-                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                        BorderThickness="0,0,0,2"
-                                                        Padding="{TemplateBinding Padding}">
-                                                    <ContentPresenter x:Name="ContentSite"
-                                                                    VerticalAlignment="Center"
-                                                                    HorizontalAlignment="Center"
-                                                                    ContentSource="Header"
-                                                                    Margin="0,0,0,0"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsSelected" Value="True">
-                                                        <Setter Property="Panel.ZIndex" Value="100"/>
-                                                        <Setter TargetName="Bd" Property="Background" Value="White"/>
-                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
+                                <Style TargetType="TabItem" BasedOn="{StaticResource SubTabItemStyle}"/>
                             </TabControl.Resources>
 
                             <!-- AAD Exclusions Tab -->
@@ -551,7 +545,7 @@
 
 
                 <!-- Annotate Policy Tab -->
-                <TabItem x:Name="AnnotatePolicyTab" Header="Annotate Policy">
+                <TabItem x:Name="AnnotatePolicyTab" Header="Annotate Policies">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -575,43 +569,8 @@
 
                         <!-- Nested Tab Control for Products -->
                         <TabControl x:Name="AnnotationProductTabControl" Grid.Row="1">
-                            <TabControl.Resources>
-                                <Style TargetType="TabItem">
-                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                    <Setter Property="FontWeight" Value="Medium"/>
-                                    <Setter Property="Padding" Value="12,6"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="TabItem">
-                                                <Border x:Name="Bd"
-                                                        Background="{TemplateBinding Background}"
-                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                        BorderThickness="0,0,0,2"
-                                                        Padding="{TemplateBinding Padding}">
-                                                    <ContentPresenter x:Name="ContentSite"
-                                                                    VerticalAlignment="Center"
-                                                                    HorizontalAlignment="Center"
-                                                                    ContentSource="Header"
-                                                                    Margin="0,0,0,0"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsSelected" Value="True">
-                                                        <Setter Property="Panel.ZIndex" Value="100"/>
-                                                        <Setter TargetName="Bd" Property="Background" Value="White"/>
-                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
+                             <TabControl.Resources>
+                                <Style TargetType="TabItem" BasedOn="{StaticResource SubTabItemStyle}"/>
                             </TabControl.Resources>
 
                             <!-- AAD Annotations Tab -->
@@ -672,7 +631,7 @@
                 </TabItem>
 
                 <!-- Omit Policy Tab -->
-                <TabItem x:Name="OmitPolicyTab" Header="Omit Policy">
+                <TabItem x:Name="OmitPolicyTab" Header="Omit Policies">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -693,43 +652,8 @@
 
                         <!-- Nested Tab Control for Products -->
                         <TabControl x:Name="OmissionProductTabControl" Grid.Row="1">
-                            <TabControl.Resources>
-                                <Style TargetType="TabItem">
-                                    <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
-                                    <Setter Property="FontWeight" Value="Medium"/>
-                                    <Setter Property="Padding" Value="12,6"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="BorderBrush" Value="Transparent"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="TabItem">
-                                                <Border x:Name="Bd"
-                                                        Background="{TemplateBinding Background}"
-                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                        BorderThickness="0,0,0,2"
-                                                        Padding="{TemplateBinding Padding}">
-                                                    <ContentPresenter x:Name="ContentSite"
-                                                                    VerticalAlignment="Center"
-                                                                    HorizontalAlignment="Center"
-                                                                    ContentSource="Header"
-                                                                    Margin="0,0,0,0"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsSelected" Value="True">
-                                                        <Setter Property="Panel.ZIndex" Value="100"/>
-                                                        <Setter TargetName="Bd" Property="Background" Value="White"/>
-                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource PrimaryBrush}"/>
-                                                        <Setter Property="FontWeight" Value="SemiBold"/>
-                                                    </Trigger>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="#F5F5F5"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
+                             <TabControl.Resources>
+                                <Style TargetType="TabItem" BasedOn="{StaticResource SubTabItemStyle}"/>
                             </TabControl.Resources>
 
                             <!-- AAD Omissions Tab -->
@@ -805,7 +729,7 @@
                                                 <TextBlock Text="Application Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
-                                            <StackPanel x:Name="ApplicationSectionContent" Visibility="Collapsed">
+                                            <StackPanel x:Name="ApplicationSection_Content" Visibility="Collapsed">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="AppID:" Width="120" VerticalAlignment="Center"/>
                                                     <TextBox x:Name="AppId_TextBox" Width="300"/>
@@ -827,7 +751,7 @@
                                                 <TextBlock Text="Output Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
-                                            <StackPanel x:Name="OutputSectionContent" Visibility="Collapsed">
+                                            <StackPanel x:Name="OutputSection_Content" Visibility="Collapsed">
                                                  <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <TextBlock Text="Output Path:" Width="120" VerticalAlignment="Center"/>
                                                     <TextBox x:Name="OutPath_TextBox" Width="220" Text="."/>
@@ -874,7 +798,7 @@
                                                 <TextBlock Text="OPA Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
-                                            <StackPanel x:Name="OpaSectionContent" Visibility="Collapsed">
+                                            <StackPanel x:Name="OpaSection_Content" Visibility="Collapsed">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                 <TextBlock Text="OPA Path:" Width="120" VerticalAlignment="Center"/>
                                                 <TextBox x:Name="OpaPath_TextBox" Width="220" Text="."/>
@@ -893,7 +817,7 @@
                                                 <TextBlock Text="General Settings" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                             </StackPanel>
 
-                                            <StackPanel x:Name="GeneralSectionContent" Visibility="Collapsed">
+                                            <StackPanel x:Name="GeneralSection_Content" Visibility="Collapsed">
                                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                                                     <CheckBox x:Name="LogIn_CheckBox" Content="Login Required" IsChecked="True"/>
                                                 </StackPanel>
@@ -951,6 +875,52 @@
                                         <Button x:Name="DownloadYamlButton"
                                             Style="{StaticResource PrimaryButton}"
                                             Content="Download YAML" Height="37" Width="104"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Debug Tab  -->
+                <TabItem x:Name="DebugTab" Header="Debug">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <!-- Debug Tab Content (Hidden by default) -->
+                        <Grid x:Name="DebugTabContent">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Style="{StaticResource Card}">
+                                <StackPanel>
+                                    <TextBlock Text="Debug Window"
+                                        FontSize="18"
+                                        FontWeight="SemiBold"
+                                        Margin="0,0,0,16"/>
+                                    <TextBlock x:Name="DebugTabInfo_TextBlock" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Grid.Row="1" >
+                                <StackPanel Margin="0,16,0,0">
+                                    <TextBox x:Name="Debug_TextBox"
+                                         Height="Auto"
+                                         FontFamily="Consolas, Courier New, monospace"
+                                         FontSize="14"
+                                         TextWrapping="Wrap"
+                                         AcceptsReturn="True"
+                                         VerticalScrollBarVisibility="Auto"
+                                         IsReadOnly="True"
+                                         Background="#F8F9FA"
+                                         Padding="16"
+                                         VerticalContentAlignment="Top"/>
+
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                                        <Button x:Name="CopyDebugLogsButton"
+                                            Style="{StaticResource SecondaryButton}"
+                                            Content="Copy to Clipboard"
+                                            Margin="0,0,8,0" Width="116"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>

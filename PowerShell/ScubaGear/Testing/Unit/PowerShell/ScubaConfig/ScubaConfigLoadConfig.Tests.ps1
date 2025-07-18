@@ -11,7 +11,7 @@ InModuleScope ScubaConfig {
         context 'Handling repeated keys in YAML file' {
             It 'Load config with dupliacte keys'{
                 # Load the first file and check the ProductNames value.
-		
+
                 {[ScubaConfig]::GetInstance().LoadConfig((Join-Path -Path $PSScriptRoot -ChildPath "./MockLoadConfig.yaml"))} | Should -Throw
             }
             AfterAll {
@@ -78,6 +78,78 @@ InModuleScope ScubaConfig {
             }
 	    AfterAll {
 	    }
+        }
+    }
+
+    Describe -tag "UI" -name 'ScubaConfigAppUI XAML Validation' {
+        BeforeAll {
+            # Mock the UI launch function to prevent actual UI from showing
+            Mock -CommandName Invoke-SCuBAConfigAppUI { return $true }
+
+            # Helper function to test XAML parsing without UI launch
+            function Test-XamlValidity {
+                param([string]$XamlPath)
+
+                try {
+                    # Load assemblies needed for XAML parsing
+                    [System.Reflection.Assembly]::LoadWithPartialName('PresentationFramework') | Out-Null
+                    [System.Reflection.Assembly]::LoadWithPartialName('PresentationCore') | Out-Null
+
+                    # Read and process XAML the same way as the main function
+                    [string]$XAML = (Get-Content $XamlPath -ReadCount 0) -replace 'mc:Ignorable="d"','' -replace "x:N",'N' -replace '^<Win.*', '<Window' -replace 'Click=".*','/>'
+                    [xml]$UIXML = $XAML
+                    $reader = New-Object System.Xml.XmlNodeReader ([xml]$UIXML)
+
+                    # Try to load the XAML - this will throw if invalid
+                    $window = [Windows.Markup.XamlReader]::Load($reader)
+
+                    return @{
+                        IsValid = $true
+                        Window = $window
+                        Error = $null
+                    }
+                }
+                catch {
+                    return @{
+                        IsValid = $false
+                        Window = $null
+                        Error = $_.Exception.Message
+                    }
+                }
+            }
+        }
+
+        Context 'XAML File Validation' {
+            It 'Should have a valid XAML file' {
+                $xamlPath = "$PSScriptRoot\..\..\..\..\Modules\ScubaConfig\ScubaConfigAppUI.xaml"
+                Test-Path $xamlPath | Should -BeTrue
+
+                $result = Test-XamlValidity -XamlPath $xamlPath
+                $result.IsValid | Should -BeTrue -Because "XAML should be valid: $($result.Error)"
+            }
+
+            It 'Should contain required UI elements' {
+                $xamlPath = "$PSScriptRoot\..\..\..\..\Modules\ScubaConfig\ScubaConfigAppUI.xaml"
+                $result = Test-XamlValidity -XamlPath $xamlPath
+
+                $result.IsValid | Should -BeTrue
+                $result.Window | Should -Not -BeNullOrEmpty
+
+                # Test for specific named elements
+                $result.Window.FindName("M365Environment_ComboBox") | Should -Not -BeNullOrEmpty
+                $result.Window.FindName("ProductsGrid") | Should -Not -BeNullOrEmpty
+                $result.Window.FindName("Organization_TextBox") | Should -Not -BeNullOrEmpty
+            }
+        }
+
+        Context 'Mocked UI Function' {
+            It 'Should not launch actual UI when mocked' {
+                # This should return true without launching UI
+                Invoke-SCuBAConfigAppUI | Should -BeTrue
+
+                # Verify the mock was called
+                Should -Invoke -CommandName Invoke-SCuBAConfigAppUI -Exactly -Times 1
+            }
         }
     }
 }

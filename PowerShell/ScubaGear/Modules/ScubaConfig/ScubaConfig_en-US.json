@@ -3,7 +3,7 @@
     "Title_TextBlock": "Scuba Configuration Editor",
     "SubTitle_TextBlock": "Create a ScubaGear configuration file for exclusions, annotations, and omissions",
     "Environment_TextBlock": "Select M365 Environment",
-    "Products_TextBlock": "Select Products",
+    "Products_TextBlock": "Select at least one product:",
     "ExclusionsInfo_TextBlock": "Exclusions are supported for the following products: {0}",
     "ExclusionsTabInfo_TextBlock": "Configure exclusions for specific policies. Exclusions allow you to customize policy behavior by excluding specific users, groups, domains, or other entities from policy evaluation. Products must be selected on the main page before configuring exclusions.",
     "OmissionsTabInfo_TextBlock": "Select policies to omit from the assessment and provide justification. Products must be selected on the main page before configuring omissions.",
