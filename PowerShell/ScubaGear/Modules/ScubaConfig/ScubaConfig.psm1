@@ -1955,6 +1955,8 @@ Function Invoke-SCuBAConfigAppUI {
                 $listContainer.Name = $fieldName + "_List"
                 [void]$arrayContainer.Children.Add($listContainer)
 
+                Add-ControlEventHandlers -Control $addButton
+
                 # Register the listContainer in syncHash for data collection
                 #syncHash.$fieldName = $listContainer
 
@@ -2050,7 +2052,8 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     })
                 }
-
+                # Add global event handlers to dynamically created stringTextBox
+                Add-ControlEventHandlers -Control $stringTextBox
                 [void]$fieldPanel.Children.Add($stringTextBox)
             }
 

@@ -86,7 +86,7 @@
       "supportsExclusions": false
     }
   ],
-  "SupportedM365Environment": [
+  "M365Environment": [
     {
       "id": "commercial",
       "name": "commercial",
