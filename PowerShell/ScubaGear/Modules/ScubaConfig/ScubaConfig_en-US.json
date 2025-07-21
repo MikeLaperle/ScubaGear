@@ -1,4 +1,6 @@
 {
+  "DebugMode": "none",
+  "Version": "1.10.0",
   "localeContext": {
     "Title_TextBlock": "Scuba Configuration Editor",
     "SubTitle_TextBlock": "Create a ScubaGear configuration file for exclusions, annotations, and omissions",
@@ -48,37 +50,37 @@
   },
   "products": [
     {
-      "id": "aad",
+      "id": "Aad",
       "name": "Microsoft Entra ID",
       "displayName": "Microsoft Entra ID (aad)",
       "supportsExclusions": true
     },
     {
-      "id": "defender",
+      "id": "Defender",
       "name": "Defender",
       "displayName": "Defender (defender)",
       "supportsExclusions": true
     },
     {
-      "id": "exo",
+      "id": "Exo",
       "name": "Exchange Online",
       "displayName": "Exchange Online (exo)",
       "supportsExclusions": true
     },
     {
-      "id": "powerplatform",
+      "id": "PowerPlatform",
       "name": "Power Platform",
       "displayName": "Power Platform (powerplatform)",
       "supportsExclusions": false
     },
     {
-      "id": "sharepoint",
+      "id": "Sharepoint",
       "name": "SharePoint & OneDrive",
       "displayName": "SharePoint & OneDrive (sharepoint)",
       "supportsExclusions": false
     },
     {
-      "id": "teams",
+      "id": "Teams",
       "name": "Microsoft Teams",
       "displayName": "Microsoft Teams (teams)",
       "supportsExclusions": false
