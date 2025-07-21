@@ -18,6 +18,18 @@ ScubaGear is an assessment tool that verifies that a Microsoft 365 (M365) tenant
 
 ScubaGear is for M365 administrators who want to assess their tenant environments against CISA Secure Configuration Baselines.
 
+## What's New 🆕
+
+**Configuration UI**: ScubaGear now includes a user-friendly graphical interface for creating and managing configuration files! 
+
+- Launch with `Invoke-SCuBAConfigAppUI -Online`
+- Intuitive setup wizard for all configuration options
+- Real-time validation and YAML preview
+- Microsoft Graph integration for user/group selection
+- Import/export existing configurations
+
+Perfect for users who prefer visual interfaces over command-line configuration.
+
 ## Overview
 
 ScubaGear uses a three-step process:
@@ -28,7 +40,37 @@ ScubaGear uses a three-step process:
 
 <img src="docs/images/scuba-process.png" />
 
+## Key Features
+
+### 🖥️ Multiple Interfaces
+- **Configuration UI**: Graphical interface for easy setup and configuration management
+- **Command Line**: PowerShell cmdlets for automation and scripting
+- **Configuration Files**: YAML-based configuration for repeatable assessments
+
+### 🔒 Comprehensive Security Coverage
+- **Azure Active Directory (AAD)**: Identity and access management policies
+- **Microsoft Defender**: Advanced threat protection settings  
+- **Exchange Online**: Email security and compliance configurations
+- **OneDrive**: File sharing and data protection policies
+- **Power Platform**: Low-code application security settings
+- **SharePoint**: Document collaboration and access controls
+- **Microsoft Teams**: Communication and meeting security policies
+
+### 📊 Rich Reporting
+- **HTML Reports**: Interactive, user-friendly compliance reports
+- **JSON Output**: Machine-readable results for automation
+- **CSV Export**: Spreadsheet-compatible data for analysis
+
+### 🎯 CISA SCuBA Alignment
+- Based on official [CISA SCuBA baselines](https://cisa.gov/scuba)
+- Regularly updated to match the latest security recommendations
+- Detailed policy mappings and explanations
+
 ## Getting Started
+
+### Quick Start Guide
+
+**1. Install ScubaGear**
 
 To install ScubaGear from [PSGallery](https://www.powershellgallery.com/packages/ScubaGear), open a PowerShell 5 terminal on a Windows computer and install the module:
 
@@ -37,66 +79,105 @@ To install ScubaGear from [PSGallery](https://www.powershellgallery.com/packages
 Install-Module -Name ScubaGear
 ```
 
-To install its dependencies:
+**2. Install Dependencies**
 
 ```powershell
 # Install the minimum required dependencies
 Initialize-SCuBA 
 ```
 
-To verify that it is installed:
+**3. Verify Installation**
 
 ```powershell
 # Check the version
 Invoke-SCuBA -Version
 ```
 
-To run ScubaGear:
+**4. Run Your First Assessment**
 
 ```powershell
-# Assess all products
+# Assess all products (basic command)
 Invoke-SCuBA -ProductNames *
 ```
 
-> **Note**:  Successfully running ScubaGear requires certain prerequisites and configuration settings.  To learn more, read through the sections below.
+### Configuration Options
+
+ScubaGear offers multiple ways to configure your assessments:
+
+#### Option 1: Configuration UI (Recommended for New Users)
+
+Use the graphical configuration interface to easily create and manage your settings:
+
+```powershell
+# Launch the Configuration UI
+Invoke-SCuBAConfigAppUI -Online
+```
+
+The Configuration UI provides:
+- ✅ **User-friendly interface** for all configuration options
+- ✅ **Real-time validation** of yaml layout
+- ✅ **YAML preview** before export configurations
+- ✅ **Import/Export** existing configurations
+- ✅ **Microsoft Graph integration** for user/group selection
+
+📖 **[Learn more about the Configuration UI →](docs/scubaconfigui.md)**
+
+#### Option 2: Configuration File
+
+Create a YAML configuration file for repeatable, automated assessments:
+
+```powershell
+# Run with a configuration file
+Invoke-SCuBA -ConfigFilePath "path/to/your/config.yaml"
+```
+
+📖 **[Learn more about Configuration Files →](docs/configuration/configuration.md)**
+
+#### Option 3: Command Line Parameters
+
+Use command-line parameters for quick, one-time assessments:
+
+```powershell
+# Example: Assess specific products with custom output
+Invoke-SCuBA -ProductNames aad,defender -OutPath "C:\Reports"
+```
+
+📖 **[See all available parameters →](docs/configuration/parameters.md)**
+
+> **⚠️ Important**: Successfully running ScubaGear requires certain prerequisites and configuration settings. See the [Prerequisites](#prerequisites) section below for detailed setup instructions.
 
 ## Table of Contents
 
-The following sections should be read in order.
+### 🚀 Getting Started
+- [Installation](#installation)
+  - [Install from PSGallery](docs/installation/psgallery.md)
+  - [Download from GitHub](docs/installation/github.md)
+  - [Uninstall](docs/installation/uninstall.md)
+- [Prerequisites](#prerequisites)
+  - [Dependencies](docs/prerequisites/dependencies.md)
+  - [Required Permissions](docs/prerequisites/permissions.md)
+    - [Interactive Permissions](docs/prerequisites/interactive.md)
+    - [Non-Interactive Permissions](docs/prerequisites/noninteractive.md)
 
-### Installation
+### ⚙️ Configuration & Usage
+- [Configuration UI](docs/scubaconfigui.md) - **Graphical interface for easy setup**
+- [Configuration File](docs/configuration/configuration.md) - **YAML-based configuration**
+- [Parameters Reference](docs/configuration/parameters.md) - **Command-line options**
 
-- [Install from PSGallery](docs/installation/psgallery.md)
-- [Download from GitHub](docs/installation/github.md)
-- [Uninstall](docs/installation/uninstall.md)
+### 🏃‍♂️ Running Assessments
+- [Execution Guide](docs/execution/execution.md)
+- [Understanding Reports](docs/execution/reports.md)
 
-### Prerequisites
-
-- [Dependencies](docs/prerequisites/dependencies.md)
-- [Required Permissions](docs/prerequisites/permissions.md)
-  - [Interactive Permissions](docs/prerequisites/interactive.md)
-  - [Non-Interactive Permissions](docs/prerequisites/noninteractive.md)
-
-### Execution
-
-- [Execution](docs/execution/execution.md)
-- [Reports](docs/execution/reports.md)
-
-### Configuration
-
-- [Parameters](docs/configuration/parameters.md)
-- [Configuration File](docs/configuration/configuration.md)
-
-### Troubleshooting
-
+### 🔧 Troubleshooting & Support
 - [Multiple Tenants](docs/troubleshooting/tenants.md)
-- [Defender](docs/troubleshooting/defender.md)
-- [Exchange Online](docs/troubleshooting/exchange.md)
-- [Power Platform](docs/troubleshooting/power.md)
-- [Microsoft Graph](docs/troubleshooting/graph.md)
-- [Proxy](docs/troubleshooting/proxy.md)
+- [Product-Specific Issues](docs/troubleshooting/)
+  - [Defender](docs/troubleshooting/defender.md)
+  - [Exchange Online](docs/troubleshooting/exchange.md)
+  - [Power Platform](docs/troubleshooting/power.md)
+  - [Microsoft Graph](docs/troubleshooting/graph.md)
+- [Network & Proxy](docs/troubleshooting/proxy.md)
 
-### Misc
+### 📚 Additional Resources
 
 - [Assumptions](docs/misc/assumptions.md)
 - [Mappings](docs/misc/mappings.md)
