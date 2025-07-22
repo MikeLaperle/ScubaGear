@@ -1165,24 +1165,21 @@
       "endpoint": "/v1.0/identity/conditionalAccess/policies",
       "queryParameters": {
         "$select": "id,displayName,state,conditions",
-        "$filter": "state eq 'enabled'",
-        "$top": 999
+        "$filter": "state eq 'enabled'"
       }
     },
     "users": {
       "name": "Users",
       "endpoint": "/v1.0/users",
       "queryParameters": {
-        "$select": "Id,DisplayName,UserPrincipalName,Mail,AccountEnabled,UserType,JobTitle,Department",
-        "$top": 999
+        "$select": "Id,DisplayName,UserPrincipalName,Mail,AccountEnabled,UserType"
       }
     },
     "groups": {
       "name": "Groups",
       "endpoint": "/v1.0/groups",
       "queryParameters": {
-        "$select": "Id,DisplayName,Description,Mail,GroupTypes,SecurityEnabled,MailEnabled",
-        "$top": 999
+        "$select": "Id,DisplayName,Description,Mail,GroupTypes,SecurityEnabled,MailEnabled"
       }
     }
   }

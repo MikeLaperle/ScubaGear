@@ -38,16 +38,18 @@ ScubaGear uses a three-step process:
 - **Step Two** - It then calls [Open Policy Agent](https://www.openpolicyagent.org) (OPA) to compare these settings against Rego security policies written per the baseline documents.
 - **Step Three** - Finally, it reports the results of the comparison as HTML, JSON, and CSV.
 
-<img src="docs/images/scuba-process.png" />
+![ScubaGear Assessment Process Diagram](docs/images/scuba-process.png)
 
 ## Key Features
 
 ### 🖥️ Multiple Interfaces
+
 - **Configuration UI**: Graphical interface for easy setup and configuration management
 - **Command Line**: PowerShell cmdlets for automation and scripting
 - **Configuration Files**: YAML-based configuration for repeatable assessments
 
 ### 🔒 Comprehensive Security Coverage
+
 - **Azure Active Directory (AAD)**: Identity and access management policies
 - **Microsoft Defender**: Advanced threat protection settings  
 - **Exchange Online**: Email security and compliance configurations
@@ -57,11 +59,13 @@ ScubaGear uses a three-step process:
 - **Microsoft Teams**: Communication and meeting security policies
 
 ### 📊 Rich Reporting
+
 - **HTML Reports**: Interactive, user-friendly compliance reports
 - **JSON Output**: Machine-readable results for automation
 - **CSV Export**: Spreadsheet-compatible data for analysis
 
 ### 🎯 CISA SCuBA Alignment
+
 - Based on official [CISA SCuBA baselines](https://cisa.gov/scuba)
 - Regularly updated to match the latest security recommendations
 - Detailed policy mappings and explanations
@@ -70,7 +74,7 @@ ScubaGear uses a three-step process:
 
 ### Quick Start Guide
 
-**1. Install ScubaGear**
+### 1. Install ScubaGear
 
 To install ScubaGear from [PSGallery](https://www.powershellgallery.com/packages/ScubaGear), open a PowerShell 5 terminal on a Windows computer and install the module:
 
@@ -79,21 +83,21 @@ To install ScubaGear from [PSGallery](https://www.powershellgallery.com/packages
 Install-Module -Name ScubaGear
 ```
 
-**2. Install Dependencies**
+### 2. Install Dependencies
 
 ```powershell
 # Install the minimum required dependencies
 Initialize-SCuBA 
 ```
 
-**3. Verify Installation**
+### 3. Verify Installation
 
 ```powershell
 # Check the version
 Invoke-SCuBA -Version
 ```
 
-**4. Run Your First Assessment**
+#### 4. Run Your First Assessment
 
 ```powershell
 # Assess all products (basic command)
@@ -114,13 +118,14 @@ Invoke-SCuBAConfigAppUI -Online
 ```
 
 The Configuration UI provides:
+
 - ✅ **User-friendly interface** for all configuration options
 - ✅ **Real-time validation** of yaml layout
 - ✅ **YAML preview** before export configurations
 - ✅ **Import/Export** existing configurations
 - ✅ **Microsoft Graph integration** for user/group selection
 
-📖 **[Learn more about the Configuration UI →](docs/scubaconfigui.md)**
+📖 **[Learn more about the Configuration UI →](docs/configuration/scubaconfigui.md)**
 
 #### Option 2: Configuration File
 
@@ -149,6 +154,7 @@ Invoke-SCuBA -ProductNames aad,defender -OutPath "C:\Reports"
 ## Table of Contents
 
 ### 🚀 Getting Started
+
 - [Installation](#installation)
   - [Install from PSGallery](docs/installation/psgallery.md)
   - [Download from GitHub](docs/installation/github.md)
@@ -160,15 +166,18 @@ Invoke-SCuBA -ProductNames aad,defender -OutPath "C:\Reports"
     - [Non-Interactive Permissions](docs/prerequisites/noninteractive.md)
 
 ### ⚙️ Configuration & Usage
+
 - [Configuration UI](docs/scubaconfigui.md) - **Graphical interface for easy setup**
 - [Configuration File](docs/configuration/configuration.md) - **YAML-based configuration**
 - [Parameters Reference](docs/configuration/parameters.md) - **Command-line options**
 
 ### 🏃‍♂️ Running Assessments
+
 - [Execution Guide](docs/execution/execution.md)
 - [Understanding Reports](docs/execution/reports.md)
 
 ### 🔧 Troubleshooting & Support
+
 - [Multiple Tenants](docs/troubleshooting/tenants.md)
 - [Product-Specific Issues](docs/troubleshooting/)
   - [Defender](docs/troubleshooting/defender.md)

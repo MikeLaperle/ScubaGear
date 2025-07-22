@@ -12,6 +12,8 @@ ScubaConfig is a PowerShell module that includes:
 - **Connected Support**: Simplify selection screen to pull in graph users and groups
 - **Debug Capabilities**: Comprehensive debugging features
 
+![ScubaGear Assessment Process Diagram](../images/scubaconfigui_main.png)
+
 ## Main Function
 
 ### Invoke-SCuBAConfigAppUI
@@ -48,6 +50,52 @@ Invoke-SCuBAConfigAppUI -YAMLConfigFile "C:\configs\myconfig.yaml"
 
 # Launch and connect to graph for GCC High environment
 Invoke-SCuBAConfigAppUI -Online -M365Environment gcchigh
+```
+
+## Features
+
+### Configuration Management
+
+- **Organization Settings**: Tenant information, display names, descriptions
+- **Product Selection**: Choose which M365 services to assess
+- **Exclusions**: Configure policy exclusions for product-specific configurations outline in the [Configuration File](docs/configuration/configuration.md)
+- **Annotations**: Add contextual information to policies
+- **Omissions**: Skip specific policies with rationale and expiration dates
+- **Advanced Settings**: Output paths, authentication, and technical parameters
+
+### User Interface
+
+- **Tabbed Navigation**: Organized sections for different configuration areas
+- **Real-time Validation**: Input validation with immediate feedback
+- **Preview Generation**: Live YAML preview before export
+- **Import/Export**: Load existing configurations and save new ones (See [Known UI Issues](#Known UI Issues))
+- **Graph Integration**: Browse users and groups via Microsoft Graph API
+
+### File Operations
+
+- **YAML Import**: Load existing ScubaGear configuration files
+- **YAML Export**: Save configurations in ScubaGear-compatible format
+- **Clipboard Support**: Copy configurations for use elsewhere
+- **Auto-naming**: Intelligent file naming based on organization settings
+
+## Usage Workflow
+
+1. **Launch**: Start the UI with `Invoke-SCuBAConfigAppUI`
+2. **Configure**: Set organization information and select products
+3. **Customize**: Add exclusions, annotations, and omissions as needed
+4. **Advanced**: Configure authentication and output settings
+5. **Preview**: Generate and review the YAML configuration
+6. **Export**: Save or copy the configuration for use with ScubaGear
+
+![ScubaGear Assessment Process Diagram](../images/scubaconfigui_preview.png)
+
+## Integration with ScubaGear
+
+The configurations created by this UI are fully compatible with the main ScubaGear assessment tool:
+
+```powershell
+# Use the generated configuration
+Invoke-SCuBA -ConfigFilePath "path\to\generated\domain.onmicrosoft.com.yaml"
 ```
 
 ## Module Files
@@ -153,46 +201,6 @@ Example:
 }
 ```
 
-## Features
-
-### Configuration Management
-- **Organization Settings**: Tenant information, display names, descriptions
-- **Product Selection**: Choose which M365 services to assess
-- **Exclusions**: Configure policy exclusions for specific users, groups, or domains
-- **Annotations**: Add contextual information to policies
-- **Omissions**: Skip specific policies with rationale and expiration dates
-- **Advanced Settings**: Output paths, authentication, and technical parameters
-
-### User Interface
-- **Tabbed Navigation**: Organized sections for different configuration areas
-- **Real-time Validation**: Input validation with immediate feedback
-- **Preview Generation**: Live YAML preview before export
-- **Import/Export**: Load existing configurations and save new ones
-- **Graph Integration**: Browse users and groups via Microsoft Graph API
-
-### File Operations
-- **YAML Import**: Load existing ScubaGear configuration files
-- **YAML Export**: Save configurations in ScubaGear-compatible format
-- **Clipboard Support**: Copy configurations for use elsewhere
-- **Auto-naming**: Intelligent file naming based on organization settings
-
-## Usage Workflow
-
-1. **Launch**: Start the UI with `Invoke-SCuBAConfigAppUI`
-2. **Configure**: Set organization information and select products
-3. **Customize**: Add exclusions, annotations, and omissions as needed
-4. **Advanced**: Configure authentication and output settings
-5. **Preview**: Generate and review the YAML configuration
-6. **Export**: Save or copy the configuration for use with ScubaGear
-
-## Integration with ScubaGear
-
-The configurations created by this UI are fully compatible with the main ScubaGear assessment tool:
-
-```powershell
-# Use the generated configuration
-Invoke-SCuBA -ConfigFilePath "path\to\generated\config.yaml"
-```
 
 ## Requirements
 
@@ -212,16 +220,24 @@ Invoke-SCuBA -ConfigFilePath "path\to\generated\config.yaml"
 ### Debug Information
 
 Enable debug mode to get detailed information about:
+
 - UI events and user interactions
 - Configuration validation results
 - Import/export operations
 - Graph API calls and responses
+
+## Known UI Issues
+
+- When importing a configuration file, the Exclusions, Annotations, and Omissions tabs do not refresh, though the data is successfully parsed and visible in the Preview. Adding new items to an existing policy may overwrite the imported data. Creating new policies is unaffected. A fix is planned for a future update.
+- The UI does not support YAML anchors or aliases at this time.
+- The Online parameter does not support using a service principal at this time. It must be interactive
 
 ## Development
 
 ### Extending the UI
 
 The UI is built using WPF and follows MVVM-like patterns:
+
 - **View**: Defined in `ScubaConfigAppUI.xaml`
 - **Logic**: Contained in `ScubaConfig.psm1`
 - **Data**: Managed through PowerShell hashtables and objects
@@ -248,6 +264,7 @@ Same license as the parent ScubaGear project.
 ## Support
 
 For issues and questions:
+
 - **ScubaGear Issues**: [GitHub Issues](https://github.com/cisagov/ScubaGear/issues)
 - **Documentation**: [ScubaGear Docs](https://github.com/cisagov/ScubaGear/docs)
 - **Discussions**: [GitHub Discussions](https://github.com/cisagov/ScubaGear/discussions)

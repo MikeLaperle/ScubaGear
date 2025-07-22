@@ -1024,7 +1024,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                                                 if ($field.type -eq "array" -and $fieldValue -is [array]) {
                                                     # Handle array fields
-                                                    $listContainer = $syncHash.("$controlName" + "_List")
+                                                    $listContainer = $syncHash.($controlName + "_List")
                                                     if ($listContainer) {
                                                         # Clear existing items
                                                         $listContainer.Children.Clear()
@@ -1058,7 +1058,7 @@ Function Invoke-SCuBAConfigAppUI {
                                                     }
                                                 } else {
                                                     # Handle single value fields
-                                                    $control = $syncHash.("$controlName" + "_TextBox")
+                                                    $control = $syncHash.($controlName + "_TextBox")
                                                     if ($control) {
                                                         $control.Text = $fieldValue
                                                         $control.Foreground = [System.Windows.Media.Brushes]::Black
@@ -2392,7 +2392,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                     if ($field.type -eq "array") {
                         # For arrays, look for the list container
-                        $listContainerName = $fieldName + "_List"
+                        $listContainerName = ($fieldName + "_List")
                         $listContainer = $detailsPanel.Children | ForEach-Object {
                             if ($_ -is [System.Windows.Controls.StackPanel]) {
                                 $arrayContainer = $_.Children | Where-Object { $_.Name -eq ($fieldName + "_Container") }
@@ -2422,7 +2422,7 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     } elseif ($field.type -eq "string") {
                         # For strings, look for the TextBox
-                        $stringFieldName = $fieldName + "_TextBox"
+                        $stringFieldName = ($fieldName + "_TextBox")
                         $stringTextBox = $detailsPanel.Children | ForEach-Object {
                             if ($_ -is [System.Windows.Controls.StackPanel]) {
                                 return $_.Children | Where-Object { $_.Name -eq $stringFieldName -and $_ -is [System.Windows.Controls.TextBox] }
@@ -2558,7 +2558,7 @@ Function Invoke-SCuBAConfigAppUI {
                 [string]$QueryType,
                 $GraphConfig,
                 [string]$FilterString,
-                [int]$Top = 500,
+                [int]$Top = 999,
                 [string]$ProgressMessage = "Retrieving data..."
             )
 
@@ -2593,9 +2593,7 @@ Function Invoke-SCuBAConfigAppUI {
                     # Add existing query parameters from config
                     if ($queryConfig.queryParameters) {
                         foreach ($param in $queryConfig.queryParameters.psobject.properties.name) {
-                            if ($param -ne '$top') {  # We'll handle $top separately
-                                $queryStringParts += "$param=$($queryConfig.queryParameters.$param)"
-                            }
+                            $queryStringParts += "$param=$($queryConfig.queryParameters.$param)"
                         }
                     }
 
