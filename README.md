@@ -20,15 +20,16 @@ ScubaGear is for M365 administrators who want to assess their tenant environment
 
 ## What's New 🆕
 
-**Configuration UI**: ScubaGear now includes a user-friendly graphical interface for creating and managing configuration files! 
+**YAML Configuration UI**: SCuBA now includes a graphical user interface that makes it easier than ever to create and manage your YAML configuration files. This intuitive tool helps reduce the complexity of manual editing and streamlines the configuration process for your organization.
 
-- Launch with `Invoke-SCuBAConfigAppUI -Online`
-- Intuitive setup wizard for all configuration options
-- Real-time validation and YAML preview
-- Microsoft Graph integration for user/group selection
-- Import/export existing configurations
+#### 🚀 Key Features:
+- Launch with `Invoke-SCuBAConfigAppUI`
+- Step-by-step setup wizard covering all configuration options
+- Real-time validation with live YAML preview
+- Microsoft Graph integration for user and group selection
+- Seamless import/export of existing configuration files
 
-Perfect for users who prefer visual interfaces over command-line configuration.
+> Ideal for users who prefer a visual interface over command-line tools.
 
 ## Overview
 
@@ -51,7 +52,7 @@ ScubaGear uses a three-step process:
 ### 🔒 Comprehensive Security Coverage
 
 - **Azure Active Directory (AAD)**: Identity and access management policies
-- **Microsoft Defender**: Advanced threat protection settings  
+- **Microsoft Defender**: Advanced threat protection settings
 - **Exchange Online**: Email security and compliance configurations
 - **OneDrive**: File sharing and data protection policies
 - **Power Platform**: Low-code application security settings
@@ -87,7 +88,7 @@ Install-Module -Name ScubaGear
 
 ```powershell
 # Install the minimum required dependencies
-Initialize-SCuBA 
+Initialize-SCuBA
 ```
 
 ### 3. Verify Installation
@@ -97,16 +98,30 @@ Initialize-SCuBA
 Invoke-SCuBA -Version
 ```
 
-#### 4. Run Your First Assessment
+### 4. Run Your First Assessment
 
 ```powershell
 # Assess all products (basic command)
 Invoke-SCuBA -ProductNames *
 ```
 
-### Configuration Options
+> [!IMPORTANT]
+> ScubaGear requires specific prerequisites and configuration values. After running your first assessment, review the results carefully. Address any gaps by configuring your tenant or documenting risk acceptance in the YAML file using exclusions, annotations, or omissions.
 
-ScubaGear offers multiple ways to configure your assessments:
+### 5. Build YAML configuration file
+
+📄 **Why You Need a YAML Configuration File**
+
+ScubaGear uses a YAML configuration file to define how your environment should be evaluated. This file serves several important purposes:
+
+- ✅ **Customization** – Specify which products, baselines, and rules apply to your environment.
+- ⚙️ **Configuration Mapping** – Align ScubaGear’s policies with your tenant’s current settings.
+- 🛡 **Risk Acceptance** – Document intentional deviations from baselines using **exclusions**, **annotations**, or **omissions**.
+- 🧾 **Traceability** – Maintain a clear record of accepted risks and policy decisions for audits or internal reviews.
+- 🔁 **Repeatability** – Run consistent assessments over time or across environments using the same configuration.
+
+> **Note:** Without a properly defined YAML file, ScubaGear will assume a default configuration that may not reflect your organization’s actual policies or risk posture.
+
 
 #### Option 1: Configuration UI (Recommended for New Users)
 
@@ -114,42 +129,39 @@ Use the graphical configuration interface to easily create and manage your setti
 
 ```powershell
 # Launch the Configuration UI
-Invoke-SCuBAConfigAppUI -Online
+Invoke-SCuBAConfigAppUI
 ```
 
 The Configuration UI provides:
 
 - ✅ **User-friendly interface** for all configuration options
-- ✅ **Real-time validation** of yaml layout
+- ✅ **Real-time validation** of YAML layout
 - ✅ **YAML preview** before export configurations
 - ✅ **Import/Export** existing configurations
 - ✅ **Microsoft Graph integration** for user/group selection
 
 📖 **[Learn more about the Configuration UI →](docs/configuration/scubaconfigui.md)**
 
-#### Option 2: Configuration File
+📖 **[Learn more about Configuration Files →](docs/configuration/configuration.md)**
 
-Create a YAML configuration file for repeatable, automated assessments:
+#### Option 2: Reuse provided sample files
+
+- 📄 [View the Sample Configuration](PowerShell\ScubaGear\Sample-Config-Files) →
+- 📖 [Learn about all configuration options](docs/configuration/configuration.md) →
+
+> [!TIP]
+> A sample YAML configuration file is included to help you get started quickly. You can import this file into the UI or use it directly with the ScubaGear engine.
+
+### 6: Run Scuba with configuration File
+
+While a YAML configuration file is nto required to rune ScubaGear is is HIGHLY RECOMMENDED and almost required for any of those reporting to the BOD
 
 ```powershell
 # Run with a configuration file
-Invoke-SCuBA -ConfigFilePath "path/to/your/config.yaml"
+Invoke-SCuBA -ConfigFilePath "path/to/your/config.YAML"
 ```
 
-📖 **[Learn more about Configuration Files →](docs/configuration/configuration.md)**
-
-#### Option 3: Command Line Parameters
-
-Use command-line parameters for quick, one-time assessments:
-
-```powershell
-# Example: Assess specific products with custom output
-Invoke-SCuBA -ProductNames aad,defender -OutPath "C:\Reports"
-```
-
-📖 **[See all available parameters →](docs/configuration/parameters.md)**
-
-> **⚠️ Important**: Successfully running ScubaGear requires certain prerequisites and configuration settings. See the [Prerequisites](#prerequisites) section below for detailed setup instructions.
+> the scubamodule supports several paramaters.
 
 ## Table of Contents
 
@@ -198,16 +210,16 @@ Unless otherwise noted, this project is distributed under the Creative Commons Z
 [release]: https://github.com/cisagov/ScubaGear/releases
 [license]: https://github.com/cisagov/ScubaGear/blob/main/LICENSE
 [psgallery]: https://www.powershellgallery.com/packages/ScubaGear
-[github-cicd-workflow]: https://github.com/cisagov/ScubaGear/actions/workflows/run_pipeline.yaml
+[github-cicd-workflow]: https://github.com/cisagov/ScubaGear/actions/workflows/run_pipeline.YAML
 [github-issues]: https://github.com/cisagov/ScubaGear/issues
 [github-license-img]: https://img.shields.io/github/license/cisagov/ScubaGear
 [github-release-img]: https://img.shields.io/github/v/release/cisagov/ScubaGear?label=GitHub&logo=github
 [psgallery-release-img]: https://img.shields.io/powershellgallery/v/ScubaGear?logo=powershell&label=PSGallery
-[ci-pipeline]: https://github.com/cisagov/ScubaGear/actions/workflows/run_pipeline.yaml
-[ci-pipeline-img]: https://github.com/cisagov/ScubaGear/actions/workflows/run_pipeline.yaml/badge.svg
-[functional-test]: https://github.com/cisagov/ScubaGear/actions/workflows/test_production_function.yaml
-[functional-test-img]: https://github.com/cisagov/ScubaGear/actions/workflows/test_production_function.yaml/badge.svg
-[github-cicd-workflow-img]: https://img.shields.io/github/actions/workflow/status/cisagov/ScubaGear/run_pipeline.yaml?logo=github
+[ci-pipeline]: https://github.com/cisagov/ScubaGear/actions/workflows/run_pipeline.YAML
+[ci-pipeline-img]: https://github.com/cisagov/ScubaGear/actions/workflows/run_pipeline.YAML/badge.svg
+[functional-test]: https://github.com/cisagov/ScubaGear/actions/workflows/test_production_function.YAML
+[functional-test-img]: https://github.com/cisagov/ScubaGear/actions/workflows/test_production_function.YAML/badge.svg
+[github-cicd-workflow-img]: https://img.shields.io/github/actions/workflow/status/cisagov/ScubaGear/run_pipeline.YAML?logo=github
 [github-downloads-img]: https://img.shields.io/github/downloads/cisagov/ScubaGear/total?logo=github
 [psgallery-downloads-img]: https://img.shields.io/powershellgallery/dt/ScubaGear?logo=powershell
 [github-issues-img]: https://img.shields.io/github/issues/cisagov/ScubaGear

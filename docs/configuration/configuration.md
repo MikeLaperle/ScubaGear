@@ -251,9 +251,11 @@ The policy `MS.DEFENDER.2.3v1` supports a variable called `PartnerDomains` that 
 Each domain in the list should be shown as the fully-qualified domain name associated with the partner organization. These domains are also added to the `Include custom domains` list, but the variable is kept separate to document the association with the associated Defender baseline policy.
 
 ### Exchange Online Configuration
+
 The ScubaGear configuration file provides the capability to exclude specific domains from the MS.EXO.1.1v2 policy check.
 
 #### Automatic Forwarding to Remote Domains
+
 The policy `MS.EXO.1.1v2` supports a variable called `AllowedForwardingDomains` that expects a list of domain names for which automatic forwarding should be allowed.
 Each domain in the list should be given as the fully-qualified domain name.
 Exercise caution when allowing automatic forwarding to an external domain, as adversaries can use automatic forwarding to gain persistent access to a victim's email.

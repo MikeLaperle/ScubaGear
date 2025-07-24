@@ -519,7 +519,7 @@
                 </TabControl.Resources>
                 <!-- Main Tab -->
                 <TabItem x:Name="MainTab" Header="Main">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,-10,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="10,0,-10,0" Style="{StaticResource ModernScrollViewer}">
                         <!-- Main Tab -->
                         <Grid x:Name="MainTabContent" Visibility="Visible">
                             <Border Style="{StaticResource Card}">
@@ -618,7 +618,7 @@
 
                             <!-- AAD Exclusions Tab -->
                             <TabItem x:Name="AadExclusionTab" Header="AAD" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="AadExclusionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -627,7 +627,7 @@
 
                             <!-- Defender Exclusions Tab -->
                             <TabItem x:Name="DefenderExclusionTab" Header="DEFENDER" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="DefenderExclusionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -636,7 +636,7 @@
 
                             <!-- EXO Exclusions Tab -->
                             <TabItem x:Name="ExoExclusionTab" Header="EXO" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="ExoExclusionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -645,7 +645,7 @@
 
                             <!-- PowerPlatform Exclusions Tab -->
                             <TabItem x:Name="PowerPlatformExclusionTab" Header="POWERPLATFORM" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="PowerPlatformExclusionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -654,7 +654,7 @@
 
                             <!-- SharePoint Exclusions Tab -->
                             <TabItem x:Name="SharePointExclusionTab" Header="SHAREPOINT" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="SharePointExclusionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -663,7 +663,7 @@
 
                             <!-- Teams Exclusions Tab -->
                             <TabItem x:Name="TeamsExclusionTab" Header="TEAMS" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="TeamsExclusionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -705,7 +705,7 @@
 
                             <!-- AAD Annotations Tab -->
                             <TabItem x:Name="AadAnnotationTab" Header="AAD" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="AadAnnotationContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -714,7 +714,7 @@
 
                             <!-- Defender Annotations Tab -->
                             <TabItem x:Name="DefenderAnnotationTab" Header="DEFENDER" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="DefenderAnnotationContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -723,7 +723,7 @@
 
                             <!-- EXO Annotations Tab -->
                             <TabItem x:Name="ExoAnnotationTab" Header="EXO" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="ExoAnnotationContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -732,7 +732,7 @@
 
                             <!-- PowerPlatform Annotations Tab -->
                             <TabItem x:Name="PowerPlatformAnnotationTab" Header="POWERPLATFORM" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="PowerPlatformAnnotationContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -741,7 +741,7 @@
 
                             <!-- SharePoint Annotations Tab -->
                             <TabItem x:Name="SharePointAnnotationTab" Header="SHAREPOINT" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="SharePointAnnotationContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -750,7 +750,7 @@
 
                             <!-- Teams Annotations Tab -->
                             <TabItem x:Name="TeamsAnnotationTab" Header="TEAMS" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="TeamsAnnotationContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -788,7 +788,7 @@
 
                             <!-- AAD Omissions Tab -->
                             <TabItem x:Name="AadOmissionTab" Header="AAD" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="AadOmissionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -797,7 +797,7 @@
 
                             <!-- Defender Omissions Tab -->
                             <TabItem x:Name="DefenderOmissionTab" Header="DEFENDER" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="DefenderOmissionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -806,7 +806,7 @@
 
                             <!-- EXO Omissions Tab -->
                             <TabItem x:Name="ExoOmissionTab" Header="EXO" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="ExoOmissionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -815,7 +815,7 @@
 
                             <!-- PowerPlatform Omissions Tab -->
                             <TabItem x:Name="PowerPlatformOmissionTab" Header="POWERPLATFORM" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="PowerPlatformOmissionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -824,7 +824,7 @@
 
                             <!-- SharePoint Omissions Tab -->
                             <TabItem x:Name="SharePointOmissionTab" Header="SHAREPOINT" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="SharePointOmissionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -833,7 +833,7 @@
 
                             <!-- Teams Omissions Tab -->
                             <TabItem x:Name="TeamsOmissionTab" Header="TEAMS" IsEnabled="False">
-                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="0,16,0,0" Style="{StaticResource ModernScrollViewer}">
                                     <StackPanel x:Name="TeamsOmissionContent">
                                         <!-- Will be populated dynamically -->
                                     </StackPanel>
@@ -845,7 +845,7 @@
 
                 <!-- Advanced Tab -->
                 <TabItem x:Name="AdvancedTab" Header="Advanced">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Style="{StaticResource ModernScrollViewer}">
                         <Grid x:Name="AdvancedTabContent">
                             <Border Style="{StaticResource Card}">
                                 <StackPanel>
@@ -965,7 +965,7 @@
 
                 <!-- Preview Tab -->
                 <TabItem x:Name="PreviewTab" Header="Preview">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Style="{StaticResource ModernScrollViewer}">
                         <!-- Preview Tab Content (Hidden by default) -->
                         <Grid x:Name="PreviewTabContent">
                             <Grid.RowDefinitions>
@@ -1014,7 +1014,7 @@
 
                 <!-- Debug Tab  -->
                 <TabItem x:Name="DebugTab" Header="Debug">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Style="{StaticResource ModernScrollViewer}" >
                         <!-- Debug Tab Content (Hidden by default) -->
                         <Grid x:Name="DebugTabContent">
                             <Grid.RowDefinitions>
