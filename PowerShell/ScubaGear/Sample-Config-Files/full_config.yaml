@@ -249,6 +249,7 @@ OmitPolicy:
   MS.SHAREPOINT.3.3v1:
     Rationale: "The re-authentication days for people who use a verification code is set to 90 days, which is acceptable
       to the organization. This policy is not applicable to our environment."
+    Expiration: 2026-01-03
 
   # -------------------------------------
   # OMIT POLICY : DEFENDER SAMPLE

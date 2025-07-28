@@ -42,7 +42,7 @@ Invoke-SCuBAConfigAppUI [[-YAMLConfigFile] <String>] [[-Language] <String>] [-On
 # Basic usage - Launch the configuration UI
 Invoke-SCuBAConfigAppUI
 
-# Launch with Graph connectivity for commercial environment
+# Launch with Graph connectivity for commercial environment (Interactive)
 Invoke-SCuBAConfigAppUI -Online -M365Environment commercial
 
 # Import existing configuration
@@ -121,7 +121,7 @@ The `ScubaConfig_en-US.json` file contains:
 
 ```json
 {
-  "DebugMode": "none", //supports: None, Timer, All, UI
+  "DebugMode": "none", //supports: None, Info, Verbose, Debug
   "Version": "1.10.0",
   "localeContext": {
     // UI text elements
@@ -176,32 +176,6 @@ The `ScubaConfig_en-US.json` file contains:
 }
 ```
 
-## Debug Configuration
-
-### Debug Modes
-
-The UI supports multiple debug modes configured in the JSON file:
-
-- **`none`**: No debug output (default)
-- **`UI`**: Debug information shown in UI debug tab
-- **`Timer`**: Timer-based debug information only
-- **`All`**: Complete debug output including all events
-
-### Enabling Debug Mode
-
-1. Edit `ScubaConfig_en-US.json` in the module directory
-2. Change `"DebugMode": "none"` to desired mode
-3. Restart the UI application
-
-Example:
-```json
-{
-  "DebugMode": "UI",
-  ...
-}
-```
-
-
 ## Requirements
 
 - **PowerShell 5.1** or later
@@ -211,11 +185,51 @@ Example:
 
 ## Troubleshooting
 
+### Debug Configuration
+
+#### Debug Modes
+
+The UI supports multiple debug modes configured in the JSON file:
+
+- **`None`**: No debug output (default)
+- **`Info`**: Normal information shown such as user actions and inputs
+- **`Verbose`**: Includes normal information plus control handler events
+- **`Debug`**: All details will include: Timer-based events, monitoring, and control events. [Very Noisy, Not Recommended]
+
+#### Enabling Debug Mode
+
+1. Edit `ScubaConfig_en-US.json` in the module directory
+2. Change `"DebugMode": "None"` to desired mode
+3. Restart the UI application
+
+Example:
+```json
+{
+  "DebugMode": "Info",
+  ...
+}
+```
+
 ### Common Issues
 
-**UI won't launch**: Check PowerShell execution policy and .NET Framework version
-**Graph connectivity fails**: Verify internet connection and authentication credentials
-**Configuration validation errors**: Review required fields and format requirements
+- **UI won't launch**: Check PowerShell execution policy and .NET Framework version. Use `-Passthru` parameter to output error:
+
+  ```powershell
+  # Basic usage - Launch the configuration UI
+  $ScubaUI = Invoke-SCuBAConfigAppUI -Passthru
+  $ScubaUI.error
+  ```
+
+- **Graph connectivity fails**: Verify the `Microsoft.Graph.Authentication` module is installed and your authentication credentials has graph permissions. You must have these graph permissions.
+  
+  ```
+  User.Read.All
+  Group.Read.All
+  Policy.Read.All
+  Organization.Read.All
+  ```
+
+- **Configuration validation errors**: Review required fields and format requirements. Be sure to click `Save ` for each configurations and then the click `Review & Generate` button
 
 ### Debug Information
 
@@ -228,9 +242,10 @@ Enable debug mode to get detailed information about:
 
 ## Known UI Issues
 
-- When importing a configuration file, the Exclusions, Annotations, and Omissions tabs do not refresh, though the data is successfully parsed and visible in the Preview. Adding new items to an existing policy may overwrite the imported data. Creating new policies is unaffected. A fix is planned for a future update.
+- When importing a configuration file, the Exclusions, Annotations, and Omissions tabs do not refresh, though the data is successfully imported and visible in the Preview. Adding new items to an existing policy may overwrite the imported data. A fix is planned for a future update.
+- Clicking between `New Session` and `Import` multiple times may cause UI issues. Close UI and relaunch is the recommended
 - The UI does not support YAML anchors or aliases at this time.
-- The Online parameter does not support using a service principal at this time. It must be interactive
+- The `-Online` parameter does not support using a service principal at this time. It must be interactive
 
 ## Development
 
@@ -239,7 +254,7 @@ Enable debug mode to get detailed information about:
 The UI is built using WPF and follows MVVM-like patterns:
 
 - **View**: Defined in `ScubaConfigAppUI.xaml`
-- **Logic**: Contained in `ScubaConfig.psm1`
+- **Logic**: Contained in `ScubaConfigAppUI.psm1`
 - **Data**: Managed through PowerShell hashtables and objects
 
 ### Adding Localization

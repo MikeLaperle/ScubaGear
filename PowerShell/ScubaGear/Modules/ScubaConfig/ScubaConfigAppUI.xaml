@@ -1035,7 +1035,7 @@
                             <Border Grid.Row="1" >
                                 <StackPanel Margin="0,16,0,0">
                                     <TextBox x:Name="Debug_TextBox"
-                                         Height="470"
+                                         Height="420"
                                          FontFamily="Consolas, Courier New, monospace"
                                          FontSize="14"
                                          TextWrapping="Wrap"

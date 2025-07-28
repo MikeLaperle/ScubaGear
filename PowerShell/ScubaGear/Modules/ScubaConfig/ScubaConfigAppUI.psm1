@@ -78,14 +78,12 @@ Function Invoke-SCuBAConfigAppUI {
             Write-Output "Successfully connected to Microsoft Graph"
         }
         catch {
-            Write-Warning "Failed to connect to Microsoft Graph: $($_.Exception.Message)"
+            Write-Error "Failed to connect to Microsoft Graph: $($_.Exception.Message)"
             $Online = $false
         }
     } else {
         $Online = $false
     }
-
-
 
     # build a hash table with locale data to pass to runspace
     $syncHash = [hashtable]::Synchronized(@{})
@@ -122,27 +120,22 @@ Function Invoke-SCuBAConfigAppUI {
 
         #need to replace compile code in xaml and x:Class and xmlns needs to be removed
         #$xaml = $xaml -replace 'xmlns:x="http://schemas.microsoft
+
         [string]$XAML = (Get-Content $syncHash.XamlPath -ReadCount 0) -replace 'mc:Ignorable="d"','' -replace "x:N",'N' -replace '^<Win.*', '<Window' -replace 'Click=".*','/>'
         [xml]$UIXML = $XAML
         $reader = New-Object System.Xml.XmlNodeReader ([xml]$UIXML)
         $syncHash.window = [Windows.Markup.XamlReader]::Load($reader)
-
+        $syncHash.UIXML = $UIXML
         # Store Form Objects In PowerShell
         $UIXML.SelectNodes("//*[@Name]") | ForEach-Object{ $syncHash."$($_.Name)" = $syncHash.Window.FindName($_.Name)}
 
-        #Import UI configuration file
-        $syncHash.UIConfigs = Get-Content -Path $syncHash.UIConfigPath -Raw | ConvertFrom-Json
-        Write-DebugOutput -Message "UIConfigs loaded: $($syncHash.UIConfigPath)" -Source "UI Launch" -Level "Info"
-
-        $syncHash.DebugMode = $syncHash.UIConfigs.DebugMode
-
-        # If YAMLImport is specified, load the YAML configuration
-        If($syncHash.YAMLImport){
-            $syncHash.YAMLConfig = Get-Content -Path $syncHash.YAMLImport -Raw | ConvertFrom-Yaml
-            Write-DebugOutput -Message "YAMLConfig loaded: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
-        }
-
         function Write-DebugOutput {
+            <#
+            .SYNOPSIS
+            Writes debug output messages to the debug queue when debug mode is enabled.
+            .DESCRIPTION
+            This function adds timestamped debug messages to the syncHash debug queue for troubleshooting and monitoring UI operations.
+            #>
             param(
                 [string]$Message,
                 [string]$Source = "General",
@@ -157,12 +150,24 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
+        #Import UI configuration file
+        $syncHash.UIConfigs = Get-Content -Path $syncHash.UIConfigPath -Raw | ConvertFrom-Json
+        Write-DebugOutput -Message "UIConfigs loaded: $($syncHash.UIConfigPath)" -Source "UI Launch" -Level "Info"
+
+        $syncHash.DebugMode = $syncHash.UIConfigs.DebugMode
+
+        # If YAMLImport is specified, load the YAML configuration
+        If($syncHash.YAMLImport){
+            $syncHash.YAMLConfig = Get-Content -Path $syncHash.YAMLImport -Raw | ConvertFrom-Yaml
+            Write-DebugOutput -Message "YAMLConfig loaded: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
+        }
+
         $syncHash.Window.Dispatcher.Invoke([Action]{
             try {
                 $syncHash.Debug_TextBox.AppendText("UI START`r`n")
                 $syncHash.Debug_TextBox.ScrollToEnd()
             } catch {
-                Write-Warning "Dispatcher error: $($_.Exception.Message)"
+                Write-Error "Dispatcher error: $($_.Exception.Message)"
             }
         })
 
@@ -204,13 +209,13 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Only update if there have been changes
                 if ($syncHash.DataChanged) {
-                    If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Data changes detected - updating UI displays" -Source "UI Timer" -Level "Verbose"}
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message $syncHash.UIConfigs.LocaleDebugOutput.UITimerDebug -Source "UI Timer" -Level "Debug"}
                     Update-AllUIFromData
                     $syncHash.DataChanged = $false
                 }
 
             } catch {
-                If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Error in UI update timer: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"}
+                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UITimerError -f $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"}
             }
         })
 
@@ -218,7 +223,7 @@ Function Invoke-SCuBAConfigAppUI {
         # Initialize change tracking
         $syncHash.DataChanged = $false
 
-        Write-DebugOutput -Message "UI initialization started - creating timer and data structures" -Source "UI Initialization" -Level "Info"
+        Write-DebugOutput -Message $syncHash.UIConfigs.LocaleDebugOutput.UIInitializationInfo -Source "UI Initialization" -Level "Info"
 
         $syncHash.LastUpdateHash = @{
             Exclusions = ""
@@ -230,11 +235,23 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Function to mark data as changed
         Function Set-DataChanged {
+            <#
+            .SYNOPSIS
+            Sets the DataChanged flag to indicate user modifications.
+            .DESCRIPTION
+            This function sets the DataChanged flag in the syncHash to track when user input has modified the configuration data.
+            #>
             $syncHash.DataChanged = $true
         }
 
         # Recursively find all controls
-        function Find-AllControls {
+        function Find-ControlElement {
+            <#
+            .SYNOPSIS
+            Recursively searches for all control elements within a WPF container.
+            .DESCRIPTION
+            This function traverses the visual tree to find and return all control elements contained within a specified parent container.
+            #>
             param(
                 [Parameter(Mandatory = $true)]
                 [System.Windows.DependencyObject]$Parent
@@ -247,130 +264,290 @@ Function Invoke-SCuBAConfigAppUI {
                 if ($child -is [System.Windows.Controls.Control]) {
                     $results += $child
                 }
-                $results += Find-AllControls -Parent $child
+                $results += Find-ControlElement -Parent $child
             }
 
             return $results
         }
 
-        function Add-ControlEventHandlers {
+        # Function to add event handlers to a specific control (for dynamically created controls)
+        Function Add-ControlEventHandler {
+            <#
+            .SYNOPSIS
+            Adds event handlers to dynamically created WPF controls.
+            .DESCRIPTION
+            This function attaches appropriate event handlers to different types of WPF controls (TextBox, ComboBox, Button, etc.) for user interaction tracking.
+            #>
             param(
                 [System.Windows.Controls.Control]$Control
             )
 
-            switch ($Control.GetType().Name) {
-                'CheckBox' {
-                    $Control.Add_Checked({
-                        $name = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
-                        Write-DebugOutput "User checked: $name" -Source "Global Event Handler" -Level "Info"
-                    }.GetNewClosure())
+            If($syncHash.DebugMode -match 'Verbose|Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ControlEventAdd -f $Control.GetType().Name, $Control.Name) -Source $MyInvocation.MyCommand.Name -Level "Verbose"}
 
-                    $Control.Add_Unchecked({
-                        $name = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
-                        Write-DebugOutput "User unchecked: $name" -Source "Global Event Handler" -Level "Info"
+            switch($Control.GetType().Name) {
+                'TextBox' {
+                    # Add LostFocus event
+                    $Control.Add_LostFocus({
+                        $controlName = if ($this.Name) { $this.Name } else { "Unnamed TextBox" }
+                        $controlValue = $this.Text
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ControlEventSelect -f $Control.GetType().Name, $controlName, $controlValue) -Source "Control Handler" -Level "Info"
+                    }.GetNewClosure())
+                }
+                'ComboBox' {
+                    # Add SelectionChanged event
+                    $Control.Add_SelectionChanged({
+                        $controlName = if ($this.Name) { $this.Name } else { "Unnamed ComboBox" }
+                        $selectedItem = $this.SelectedItem
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ControlEventSelect -f $Control.GetType().Name, $controlName, $selectedItem) -Source "Control Handler" -Level "Info"
                     }.GetNewClosure())
                 }
                 'Button' {
+                    # Add Click event
                     $Control.Add_Click({
-                        $name = if ($this.Name) { $this.Name } else { "Unnamed Button" }
-                        Write-DebugOutput "User clicked: $name" -Source "Global Event Handler" -Level "Info"
+                        $controlName = if ($this.Name) { $this.Name } else { "Unnamed Button" }
+                        $controlContent = if ($this.Content) { " ($($this.Content))" } else { "" }
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ControlEventSelect -f $Control.GetType().Name, $controlName, $controlContent) -Source "Control Handler" -Level "Info"
                     }.GetNewClosure())
                 }
-                'TextBox' {
-                    $Control.Add_LostFocus({
-                        $name = if ($this.Name) { $this.Name } else { "Unnamed TextBox" }
-                        $value = $this.Text
-                        Write-DebugOutput "User changed text in: $name => $value" -Source "Global Event Handler" -Level "Info"
+                'CheckBox' {
+                    # Add Checked event
+                    $Control.Add_Checked({
+                        $controlName = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
+                        $controlTag = if ($this.Tag) { " (Tag: $($this.Tag))" } else { "" }
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ControlEventSelect -f $Control.GetType().Name, $controlName, $controlTag) -Source "Control Handler" -Level "Info"
+                    }.GetNewClosure())
+
+                    # Add Unchecked event
+                    $Control.Add_Unchecked({
+                        $controlName = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
+                        $controlTag = if ($this.Tag) { " (Tag: $($this.Tag))" } else { "" }
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ControlEventSelect -f $Control.GetType().Name, $controlName, $controlTag) -Source "Control Handler" -Level "Info"
                     }.GetNewClosure())
                 }
-                default {
-                    # Do nothing for other types
-                }
             }
         }
 
-        <#
-        Find-AllControls -Parent $syncHash.Window
-
-        Function Add-GlobalEventHandlers {
-            # Add event handlers to all checkboxes
-            foreach ($checkbox in $allCheckboxes) {
-                # Add Checked event
-                $checkbox.Add_Checked({
-                    $controlName = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
-                    $controlTag = if ($this.Tag) { " (Tag: $($this.Tag))" } else { "" }
-                    Write-DebugOutput -Message "User checked checkbox: $controlName$controlTag" -Source "Global Event Handler" -Level "Info"
-                }.GetNewClosure())
-
-                # Add Unchecked event
-                $checkbox.Add_Unchecked({
-                    $controlName = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
-                    $controlTag = if ($this.Tag) { " (Tag: $($this.Tag))" } else { "" }
-                    Write-DebugOutput -Message "User unchecked checkbox: $controlName$controlTag" -Source "Global Event Handler" -Level "Info"
-                }.GetNewClosure())
-            }
-
-            # Add event handlers to all buttons
-            foreach ($button in $allButtons) {
-                # Add Click event
-                $button.Add_Click({
-                    $controlName = if ($this.Name) { $this.Name } else { "Unnamed Button" }
-                    $controlContent = if ($this.Content) { " ($($this.Content))" } else { "" }
-                    Write-DebugOutput -Message "User clicked button: $controlName$controlContent" -Source "Global Event Handler" -Level "Info"
-                }.GetNewClosure())
-            }
-
-            Write-DebugOutput -Message "Global event handlers added - CheckBoxes: $($allCheckboxes.Count), Buttons: $($allButtons.Count)" -Source "UI Initialization" -Level "Info"
-        }
-
-        # Function to add event handlers to a specific control (for dynamically created controls)
-        Function Add-ControlEventHandlers {
-            param(
-                [System.Windows.Controls.Control]$Control
-            )
-
-            if ($Control -is [System.Windows.Controls.CheckBox]) {
-                # Add Checked event
-                $Control.Add_Checked({
-                    $controlName = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
-                    $controlTag = if ($this.Tag) { " (Tag: $($this.Tag))" } else { "" }
-                    Write-DebugOutput -Message "User checked checkbox: $controlName$controlTag" -Source "Checkbox Action" -Level "Info"
-                }.GetNewClosure())
-
-                # Add Unchecked event
-                $Control.Add_Unchecked({
-                    $controlName = if ($this.Name) { $this.Name } else { "Unnamed CheckBox" }
-                    $controlTag = if ($this.Tag) { " (Tag: $($this.Tag))" } else { "" }
-                    Write-DebugOutput -Message "User unchecked checkbox: $controlName$controlTag" -Source "Checkbox Action" -Level "Info"
-                }.GetNewClosure())
-            }
-            elseif ($Control -is [System.Windows.Controls.Button]) {
-                # Add Click event
-                $Control.Add_Click({
-                    $controlName = if ($this.Name) { $this.Name } else { "Unnamed Button" }
-                    $controlContent = if ($this.Content) { " ($($this.Content))" } else { "" }
-                    Write-DebugOutput -Message "User clicked button: $controlName$controlContent" -Source "Button Action" -Level "Info"
-                }.GetNewClosure())
-            }
-        }
-
-        #>
         #===========================================================================
         # UI Helper Functions
         #===========================================================================
+        # Add global event handlers to all UI controls after everything is loaded
         #Closes UI objects and exits (within runspace)
+        Function Close-UIMainWindow {
+            <#
+            .SYNOPSIS
+            Closes the main UI window and performs cleanup operations.
+            .DESCRIPTION
+            This function handles the controlled closing of the main application window, including memory cleanup and event handler removal.
+            #>
+            # Prevent recursive calls
+            if ($syncHash.isClosing) {
+                return
+            }
 
-        Function Close-UIMainWindow
-        {
-            if ($syncHash.hadCritError) { Write-Error -Message ("Critical error occurred, closing UI: {0}" -f $syncHash.Error) }
-            #if runspace has not errored Dispose the UI
-            if (!($syncHash.isClosing)) { $syncHash.Window.Close() | Out-Null }
+            try {
+                # Mark as closing immediately
+                $syncHash.isClosing = $true
+
+                # 1. Stop timers only (essential for preventing crashes)
+                if ($syncHash.UIUpdateTimer) {
+                    $syncHash.UIUpdateTimer.Stop()
+                    $syncHash.UIUpdateTimer = $null
+                }
+
+                if ($syncHash.DebugFlushTimer) {
+                    $syncHash.DebugFlushTimer.Stop()
+                    $syncHash.DebugFlushTimer = $null
+                }
+
+                # 2. Disconnect from Microsoft Graph if connected (important)
+                if ($syncHash.GraphConnected) {
+                    try {
+                        Disconnect-MgGraph -ErrorAction SilentlyContinue
+                    } catch {
+                        Write-Error "Failed to disconnect from Microsoft Graph: $_"
+                    }
+                }
+
+                # 3. Close window immediately - let .NET handle the rest
+                if ($syncHash.Window) {
+                    try {
+                        # Just close the window - skip all the detailed cleanup
+                        if ($syncHash.Window.Dispatcher.CheckAccess()) {
+                            $syncHash.Window.Close()
+                        } else {
+                            $syncHash.Window.Dispatcher.Invoke([Action]{ $syncHash.Window.Close() })
+                        }
+                    } catch {
+                        # If window can't close normally, force it
+                        $syncHash.Window = $null
+                    }
+                }
+
+                # 4. Set flags and let .NET garbage collector handle the cleanup
+                $syncHash.isClosed = $true
+
+                # Optional: Quick memory cleanup (much faster than the detailed version)
+                [System.GC]::Collect()
+
+            } catch {
+                # Don't block closing on any errors
+                $syncHash.Window = $null
+                $syncHash.isClosed = $true
+            }
         }
 
+        # Helper function to recursively remove event handlers
+        Function Remove-AllEventHandlers {
+            <#
+            .SYNOPSIS
+            Recursively removes event handlers from all controls in the UI.
+            .DESCRIPTION
+            This function traverses the visual tree and removes event handlers from controls to prevent memory leaks during application cleanup.
+            #>
+            param(
+                [System.Windows.DependencyObject]$Parent
+            )
 
+            if ($null -eq $Parent) { return }
+
+            try {
+                # Remove common event handlers - use try-catch for each to avoid stopping on errors
+                switch ($Parent.GetType().Name) {
+                    'Button' {
+                        try {
+                            # Clear the click event handlers
+                            $Parent.ClearValue([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)
+                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
+                    }
+                    'TextBox' {
+                        try {
+                            $Parent.ClearValue([System.Windows.Controls.TextBox]::TextChangedEvent)
+                            $Parent.ClearValue([System.Windows.UIElement]::GotFocusEvent)
+                            $Parent.ClearValue([System.Windows.UIElement]::LostFocusEvent)
+                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
+                    }
+                    'CheckBox' {
+                        try {
+                            $Parent.ClearValue([System.Windows.Controls.Primitives.ToggleButton]::CheckedEvent)
+                            $Parent.ClearValue([System.Windows.Controls.Primitives.ToggleButton]::UncheckedEvent)
+                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
+                    }
+                    'ComboBox' {
+                        try {
+                            $Parent.ClearValue([System.Windows.Controls.Primitives.Selector]::SelectionChangedEvent)
+                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
+                    }
+                }
+
+                # Recursively process children
+                $childCount = [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($Parent)
+                for ($i = 0; $i -lt $childCount; $i++) {
+                    $child = [System.Windows.Media.VisualTreeHelper]::GetChild($Parent, $i)
+                    Remove-AllEventHandlers -Parent $child
+                }
+
+            } catch {
+                # Silently continue if we can't remove handlers - but add to debug if possible
+                if ($syncHash.DebugOutputQueue) {
+                    try {
+                        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+                        $logEntry = "[$timestamp] [Warning] [Event Handler Cleanup] Could not remove event handlers from $($Parent.GetType().Name): $($_.Exception.Message)"
+                        $syncHash.DebugOutputQueue.Enqueue($logEntry)
+                    } catch { Write-Error "Failed to add debug message: $($_.Exception.Message)" }
+                }
+            }
+        }
+
+        # Enhanced memory cleanup function that also uses debug queue
+        Function Invoke-MemoryCleanup {
+            <#
+            .SYNOPSIS
+            Performs comprehensive memory cleanup for the application.
+            .DESCRIPTION
+            This function executes garbage collection and clears various data structures to free up memory resources.
+            #>
+            param(
+                [switch]$Aggressive
+            )
+
+            # Helper function for this cleanup
+            Function Add-MemoryDebugMessage {
+                <#
+                .SYNOPSIS
+                Adds debug messages specifically for memory cleanup operations.
+                .DESCRIPTION
+                This function creates debug messages related to memory cleanup activities and adds them to the debug queue.
+                #>
+                param([string]$Message, [string]$Level = "Info")
+
+                if ($syncHash.DebugOutputQueue) {
+                    try {
+                        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
+                        $logEntry = "[$timestamp] [$Level] [Memory Cleanup] $Message"
+                        $syncHash.DebugOutputQueue.Enqueue($logEntry)
+                    } catch { Write-Error "Failed to add debug message: $($_.Exception.Message)" }
+                }
+            }
+
+            Add-MemoryDebugMessage "Running memory cleanup..." "Info"
+
+            try {
+                $memoryBefore = [System.GC]::GetTotalMemory($false)
+
+                # Standard cleanup
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
+                [System.GC]::Collect()
+
+                if ($Aggressive) {
+                    Add-MemoryDebugMessage "Running aggressive memory cleanup..." "Info"
+
+                    # Force cleanup of all generations
+                    for ($i = 0; $i -le [System.GC]::MaxGeneration; $i++) {
+                        [System.GC]::Collect($i, [System.GCCollectionMode]::Forced)
+                    }
+
+                    # Wait for finalizers again
+                    [System.GC]::WaitForPendingFinalizers()
+
+                    # Final collection
+                    [System.GC]::Collect()
+
+                    # Compact Large Object Heap if available (.NET 4.5.1+)
+                    try {
+                        [System.Runtime.GCSettings]::LargeObjectHeapCompactionMode = [System.Runtime.GCLargeObjectHeapCompactionMode]::CompactOnce
+                        [System.GC]::Collect()
+                        Add-MemoryDebugMessage "Large Object Heap compaction completed" "Info"
+                    } catch {
+                        Add-MemoryDebugMessage "LOH compaction not available: $($_.Exception.Message)" "Warning"
+                    }
+                }
+
+                # Report memory usage
+                $memoryAfter = [System.GC]::GetTotalMemory($true)
+                $freed = $memoryBefore - $memoryAfter
+
+                Add-MemoryDebugMessage "Memory cleanup completed" "Info"
+                Add-MemoryDebugMessage "  Before: $([math]::Round($memoryBefore / 1MB, 2)) MB" "Info"
+                Add-MemoryDebugMessage "  After:  $([math]::Round($memoryAfter / 1MB, 2)) MB" "Info"
+                Add-MemoryDebugMessage "  Freed:  $([math]::Round($freed / 1MB, 2)) MB" "Info"
+
+            } catch {
+                Add-MemoryDebugMessage "Error during memory cleanup: $($_.Exception.Message)" "Error"
+            }
+        }
+
+        # Add cleanup function to syncHash
+        $syncHash.InvokeMemoryCleanup = { Invoke-MemoryCleanup }
 
         # Function to initialize placeholder text behavior for TextBox controls
         Function Initialize-PlaceholderTextBox {
+            <#
+            .SYNOPSIS
+            Configures placeholder text behavior for TextBox controls.
+            .DESCRIPTION
+            This function sets up placeholder text that appears when TextBox controls are empty and manages the visual styling for placeholder display.
+            #>
             param(
                 [System.Windows.Controls.TextBox]$TextBox,
                 [string]$PlaceholderText,
@@ -388,28 +565,51 @@ Function Invoke-SCuBAConfigAppUI {
                 $TextBox.FontStyle = [System.Windows.FontStyles]::Italic
             }
 
-            # Add GotFocus event handler
-            $TextBox.Add_GotFocus({
-                if ($this.Text -eq $PlaceholderText) {
-                    $this.Text = ""
+            <#
+            # Add PreviewTextInput to handle any character input (including space)
+            $TextBox.Add_PreviewTextInput({
+                param($sender, $e)
+                # If we're in placeholder mode, clear it before allowing input
+                if ($this.Text -eq $PlaceholderText -and $this.Foreground -eq [System.Windows.Media.Brushes]::Gray) {
+                    $this.Clear()
                     $this.Foreground = [System.Windows.Media.Brushes]::Black
                     $this.FontStyle = [System.Windows.FontStyles]::Normal
+                }
+                # Don't handle the event - let the character be processed normally
+                $e.Handled = $false
+            }.GetNewClosure())
+            #>
+
+            # Add GotFocus event handler (as backup)
+            $TextBox.Add_GotFocus({
+                if ($this.Text -eq $placeholderText) {
+                    $this.Text = ""
+                    $this.Foreground = [System.Windows.Media.Brushes]::Black
+                    $this.FontStyle = "Normal"
                 }
             }.GetNewClosure())
 
             # Add LostFocus event handler
             $TextBox.Add_LostFocus({
+                #param($sender, $e)
                 if ([string]::IsNullOrWhiteSpace($this.Text)) {
-                    $this.Text = $PlaceholderText
+                    $this.Text = $placeholderText
                     $this.Foreground = [System.Windows.Media.Brushes]::Gray
-                    $this.FontStyle = [System.Windows.FontStyles]::Italic
+                    $this.FontStyle = "Italic"
                 }
             }.GetNewClosure())
 
+#param($sender, $e)
         }
 
         # Helper function to find control by setting name
         Function Find-ControlBySettingName {
+            <#
+            .SYNOPSIS
+            Searches for WPF controls using various naming conventions.
+            .DESCRIPTION
+            This function attempts to locate controls by trying multiple naming patterns and conventions commonly used in the application.
+            #>
             param([string]$SettingName)
 
             # Define naming patterns to try
@@ -439,6 +639,12 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Helper function to update control value based on type
         Function Set-ControlValue {
+            <#
+            .SYNOPSIS
+            Updates control values based on their type and handles focus preservation.
+            .DESCRIPTION
+            This function sets values on different types of WPF controls while preserving cursor position and preventing timer interference.
+            #>
             param(
                 [object]$Control,
                 [object]$Value,
@@ -447,11 +653,19 @@ Function Invoke-SCuBAConfigAppUI {
 
             switch ($Control.GetType().Name) {
                 'TextBox' {
+                    # Skip updating if user is currently typing in this control
+                    if ($Control.IsFocused -and $Control.IsKeyboardFocused) {
+                        return
+                    }
                     $Control.Text = $Value
                     $Control.Foreground = [System.Windows.Media.Brushes]::Black
                     $Control.FontStyle = [System.Windows.FontStyles]::Normal
                 }
                 'TextBlock' {
+                    # Skip updating if user is currently typing in this control
+                    if ($Control.IsFocused -and $Control.IsKeyboardFocused) {
+                        return
+                    }
                     $Control.Text = $Value
                 }
                 'CheckBox' {
@@ -464,17 +678,26 @@ Function Invoke-SCuBAConfigAppUI {
                     $Control.Content = $Value
                 }
                 'String' {
-                    #this would update values in the syncHash directly
+                    # Skip updating if user is currently typing in this control
+                    if ($Control.IsFocused -and $Control.IsKeyboardFocused) {
+                        return
+                    }
                     $syncHash.$Control = $Value
                 }
                 default {
-                    Write-DebugOutput -Message "Unknown control type for $SettingKey`: $($Control.GetType().Name)" -Source $MyInvocation.MyCommand.Name -Level "Warning"
+                    Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.SetControlWarning -f $SettingKey,$Control.GetType().Name) -Source $MyInvocation.MyCommand.Name -Level "Warning"
                 }
             }
         }
 
         # Helper function to update ComboBox values
         Function Set-ComboBoxValue {
+            <#
+            .SYNOPSIS
+            Updates ComboBox control selection to match a specified value.
+            .DESCRIPTION
+            This function sets the selected item in a ComboBox control by matching the provided value against available items.
+            #>
             param(
                 [System.Windows.Controls.ComboBox]$ComboBox,
                 [object]$Value,
@@ -497,7 +720,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                 if ($selectedItem) {
                     $ComboBox.SelectedItem = $selectedItem
-                    Write-DebugOutput -Message "Selected M365Environment: $Value" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Selected M365Environment: $Value" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                     return
                 }
             }
@@ -518,14 +741,20 @@ Function Invoke-SCuBAConfigAppUI {
 
             if ($selectedItem) {
                 $ComboBox.SelectedItem = $selectedItem
-                Write-DebugOutput -Message "Set ComboBox [$SettingKey] to value: $Value" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.SetComboBoxInfo -f $SettingKey,$Value)  -Source $MyInvocation.MyCommand.Name -Level "Info"
             } else {
-                Write-DebugOutput -Message "Could not find ComboBox [$SettingKey] with value: $Value" -Source $MyInvocation.MyCommand.Name -Level "Warning"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.SetComboBoxWarning -f $SettingKey,$Value) -Source $MyInvocation.MyCommand.Name -Level "Warning"
             }
         }
 
         # Function to validate UI field based on regex and required status
         Function Confirm-UIField {
+            <#
+            .SYNOPSIS
+            Validates UI field values using regex patterns and required field checks.
+            .DESCRIPTION
+            This function performs validation on user input fields using regular expressions and enforces required field constraints.
+            #>
             param(
                 [System.Windows.Controls.Control]$UIElement,
                 [string]$RegexPattern,
@@ -577,6 +806,12 @@ Function Invoke-SCuBAConfigAppUI {
         }
 
         Function Update-ProductNames {
+            <#
+            .SYNOPSIS
+            Updates product name selections from UI checkboxes.
+            .DESCRIPTION
+            This function collects selected products from checkboxes and updates the GeneralSettings data structure accordingly.
+            #>
             # Collect ProductNames from checked checkboxes and update GeneralSettings
             $selectedProducts = @()
             $allProductCheckboxes = $syncHash.ProductsGrid.Children | Where-Object {
@@ -605,6 +840,12 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Function to update all UI elements from data
         Function Update-AllUIFromData {
+            <#
+            .SYNOPSIS
+            Updates all UI elements from the current data structures.
+            .DESCRIPTION
+            This function refreshes all UI components to reflect the current state of the configuration data.
+            #>
             # Update general settings
             Update-GeneralSettingsFromData
 
@@ -624,6 +865,12 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Function to update general settings UI from data (Dynamic Version)
         Function Update-GeneralSettingsFromData {
+            <#
+            .SYNOPSIS
+            Updates general settings UI controls from data.
+            .DESCRIPTION
+            This function populates general settings controls with values from the GeneralSettings data structure.
+            #>
             if (-not $syncHash.GeneralSettings) { return }
 
             try {
@@ -639,16 +886,22 @@ Function Invoke-SCuBAConfigAppUI {
                     if ($control) {
                         Set-ControlValue -Control $control -Value $settingValue -SettingKey $settingKey
                     } else {
-                        If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "No UI control found for setting: $settingKey" -Source $MyInvocation.MyCommand.Name -Level "Warning"}
+                        If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UpdateGeneralSettingInfo -f $settingKey) -Source $MyInvocation.MyCommand.Name -Level "Warning"}
                     }
                 }
             }
             catch {
-                If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Error updating general settings UI: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"}
+                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UpdateGeneralSettingError -f $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"}
             }
         }
 
         Function Update-ProductNameCheckboxFromData{
+            <#
+            .SYNOPSIS
+            Updates product name checkbox controls from data.
+            .DESCRIPTION
+            This function sets the checked state of product name checkboxes based on the current configuration data.
+            #>
             <#
             .SYNOPSIS
             Updates UI product checkboxes and ensures tabs/content are properly enabled and created
@@ -669,7 +922,7 @@ Function Invoke-SCuBAConfigAppUI {
             if ($ProductNames) {
                 if ($ProductNames -contains '*') {
                     $productsToSelect = $allProductIds
-                    If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Selecting all products due to '*' value" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UpdateProductNameDebug) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                 } else {
                     $productsToSelect = $ProductNames
                 }
@@ -701,7 +954,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $syncHash.ExclusionsTab.IsEnabled = $false
                     $syncHash.AnnotatePolicyTab.IsEnabled = $false
                     $syncHash.OmitPolicyTab.IsEnabled = $false
-                    If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Disabled main tabs - no products selected" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.DisableProductTabsDebug) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                 } else {
                     # Enable main tabs when products are selected
                     $syncHash.ExclusionsTab.IsEnabled = $true
@@ -723,7 +976,7 @@ Function Invoke-SCuBAConfigAppUI {
                             $container = $syncHash.("$($productId)OmissionContent")
                             if ($container -and $container.Children.Count -eq 0) {
                                 New-ProductOmissions -ProductName $productId -Container $container
-                                If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Created omission content for: $productId" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.CreatedOmissionContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                             }
                         }
 
@@ -734,7 +987,7 @@ Function Invoke-SCuBAConfigAppUI {
                             $container = $syncHash.("$($productId)AnnotationContent")
                             if ($container -and $container.Children.Count -eq 0) {
                                 New-ProductAnnotations -ProductName $productId -Container $container
-                                If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Created annotation content for: $productId" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.CreatedAnnotationContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                             }
                         }
 
@@ -746,12 +999,12 @@ Function Invoke-SCuBAConfigAppUI {
                                 $container = $syncHash.("$($productId)ExclusionContent")
                                 if ($container -and $container.Children.Count -eq 0) {
                                     New-ProductExclusions -ProductName $productId -Container $container
-                                    If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Created exclusion content for: $productId" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.CreatedExclusionContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                                 }
                             }
                         }
 
-                        If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Enabled tabs and ensured content for: $productId" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                        If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.EnabledTabsAndContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                     }
                 }
 
@@ -766,7 +1019,7 @@ Function Invoke-SCuBAConfigAppUI {
                 $syncHash.BulkUpdateInProgress = $false
             }
 
-            If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Updated checkboxes and tabs for products: [$($productsToSelect -join ', ')]" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+            If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UpdatedCheckboxesAndTabsDebug -f $productsToSelect -join ', ') -Source $MyInvocation.MyCommand.Name -Level "Debug"}
         }
 
         # Updated Update-ExclusionsFromData Function for hashtable structure
@@ -777,9 +1030,9 @@ Function Invoke-SCuBAConfigAppUI {
             foreach ($productName in $syncHash.Exclusions.Keys) {
                 foreach ($policyId in $syncHash.Exclusions[$productName].Keys) {
                     try {
-                        # Find the exclusion type from the baseline config
+                        # Find the exclusionField from the baseline config
                         $baseline = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
-                        if ($baseline -and $baseline.exclusionType -ne "none") {
+                        if ($baseline -and $baseline.exclusionField -ne "none") {
 
                             # Find the existing card checkbox
                             $checkboxName = ($policyId.replace('.', '_') + "_ExclusionCheckbox")
@@ -792,18 +1045,18 @@ Function Invoke-SCuBAConfigAppUI {
                                 # Get exclusion data for this policy
                                 $exclusionData = $syncHash.Exclusions[$productName][$policyId]
 
-                                # Iterate through exclusion types (YAML key names)
+                                # Iterate through exclusionFields (YAML key names)
                                 foreach ($yamlKeyName in $exclusionData.Keys) {
                                     $fieldData = $exclusionData[$yamlKeyName]
 
-                                    # Get the exclusion type configuration
-                                    $exclusionTypeConfig = $syncHash.UIConfigs.exclusionTypes.($baseline.exclusionType)
+                                    # Get the exclusionField configuration
+                                    $FieldListConfig = $syncHash.UIConfigs.inputTypes.($baseline.exclusionField)
 
-                                    if ($exclusionTypeConfig) {
-                                        # Populate the exclusion data fields based on exclusion type configuration
-                                        foreach ($field in $exclusionTypeConfig.fields) {
+                                    if ($FieldListConfig) {
+                                        # Populate the exclusion data fields based on exclusionField configuration
+                                        foreach ($field in $FieldListConfig.fields) {
                                             $fieldName = $field.name
-                                            $controlName = ($policyId.replace('.', '_') + "_" + $baseline.exclusionType + "_" + $fieldName)
+                                            $controlName = ($policyId.replace('.', '_') + "_" + $baseline.exclusionField + "_" + $fieldName)
 
                                             if ($fieldData.Keys -contains $fieldName) {
                                                 $fieldValue = $fieldData[$fieldName]
@@ -834,7 +1087,7 @@ Function Invoke-SCuBAConfigAppUI {
                                                             $removeBtn.Height = 20
                                                             $removeBtn.Add_Click({
                                                                 $listContainer.Children.Remove($itemPanel)
-                                                                Write-DebugOutput -Message "User removed item: $item" -Source $listContainer -Level "Info"
+                                                                Write-DebugOutput -Message "Item removed: $item" -Source $listContainer -Level "Info"
                                                             }.GetNewClosure())
 
                                                             [void]$itemPanel.Children.Add($itemText)
@@ -872,7 +1125,7 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                     catch {
-                        Write-DebugOutput -Message "Error updating exclusion UI for $policyId`: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ErrorUpdatingExclusionUI -f $policyId, $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"
                     }
                 }
             }
@@ -880,6 +1133,12 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Updated Update-OmissionsFromData Function
         Function Update-OmissionsFromData {
+            <#
+            .SYNOPSIS
+            Updates omission controls from the Omissions data structure.
+            .DESCRIPTION
+            This function populates omission checkboxes, rationale fields, and expiration dates with values from the configuration data.
+            #>
             if (-not $syncHash.Omissions) { return }
 
             # Iterate through products and policies in hashtable structure
@@ -928,7 +1187,7 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                     catch {
-                        Write-DebugOutput -Message "Error updating omission UI for $policyId`: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ErrorUpdatingOmissionUI -f $policyId, $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"
                     }
                 }
             }
@@ -936,6 +1195,12 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Updated Update-AnnotationsFromData Function
         Function Update-AnnotationsFromData {
+            <#
+            .SYNOPSIS
+            Updates annotation controls from the Annotations data structure.
+            .DESCRIPTION
+            This function populates annotation checkboxes and comment fields with values from the configuration data.
+            #>
             if (-not $syncHash.Annotations) { return }
 
             # Iterate through products and policies in hashtable structure
@@ -973,7 +1238,7 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                     catch {
-                        Write-DebugOutput -Message "Error updating annotation UI for $policyId`: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.ErrorUpdatingAnnotationUI -f $policyId, $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"
                     }
                 }
             }
@@ -1011,7 +1276,7 @@ Function Invoke-SCuBAConfigAppUI {
                 $syncHash.GeneralSettings.Remove("ProductNames")
             }
 
-            Write-DebugOutput -Message "Updated ProductNames in GeneralSettings: [$($selectedProducts -join ', ')]" -Source $MyInvocation.MyCommand.Name -Level "Info"
+            Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UpdatedProductNamesDebug -f ($selectedProducts -join ', ')) -Source $MyInvocation.MyCommand.Name -Level "Info"
         }
 
 
@@ -1030,7 +1295,7 @@ Function Invoke-SCuBAConfigAppUI {
 
             # Check if we have any selected products
             if (-not $syncHash.GeneralSettings.ProductNames -or $syncHash.GeneralSettings.ProductNames.Count -eq 0) {
-                Write-DebugOutput -Message "No ProductNames selected, returning empty array for YAML" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.YamlImportNoProductSelectedWarning) -Source $MyInvocation.MyCommand.Name -Level "Warning"
                 return @()
             }
 
@@ -1044,274 +1309,93 @@ Function Invoke-SCuBAConfigAppUI {
                                    (-not (Compare-Object $selectedProducts $availableProducts))
 
             if ($isAllProductsSelected) {
-                Write-DebugOutput -Message "All products selected, returning '*' for YAML output" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.YamlAllProductsSelectedInfo) -Source $MyInvocation.MyCommand.Name -Level "Info"
                 return "`nProductNames: ['*']"
             } else {
-                Write-DebugOutput -Message "Returning specific product list for YAML: [$($selectedProducts -join ', ')]" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.YamlSpecificProductListInfo -f ($selectedProducts -join ', ')) -Source $MyInvocation.MyCommand.Name -Level "Info"
                 Return ("`nProductNames: " + ($selectedProducts | ForEach-Object { "`n  - $_" }) -join '')
             }
         }
 
-        #===========================================================================
-        #
-        # DYNAMIC ELEMENT FUNCTIONS
-        #
-        #===========================================================================
-
-        #===========================================================================
-        # ANNOTATION dynamic controls
-        #===========================================================================
-        # Function to create an annotation card UI element
-        Function New-AnnotationCard {
+        # Function to populate cards for product policies
+        Function New-ProductPolicyCards {
+            <#
+            .SYNOPSIS
+            Creates policy cards for exclusions, omissions, or annotations.
+            .DESCRIPTION
+            This function generates UI cards for each policy baseline of a product, allowing users to configure exclusions, omissions, or annotations.
+            #>
             param(
-                [string]$PolicyId,
                 [string]$ProductName,
-                [string]$PolicyName,
-                [string]$PolicyDescription
+                [System.Windows.Controls.StackPanel]$Container,
+                [string]$ControlType  # "Exclusions", "Omissions", or "Annotations"
             )
 
-            # Create the main card border
-            $card = New-Object System.Windows.Controls.Border
-            $card.Style = $syncHash.Window.FindResource("Card")
-            $card.Margin = "0,0,0,12"
+            $Container.Children.Clear()
 
-            # Create main grid for the card
-            $cardGrid = New-Object System.Windows.Controls.Grid
-            [void]$cardGrid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{ Height = "Auto" }))
-            [void]$cardGrid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{ Height = "Auto" }))
+            # Get the baseline control configuration for this type
+            $baselineControl = $syncHash.UIConfigs.baselineControls | Where-Object { $_.dataControlOutput -eq $ControlType }
 
-            # Create header with checkbox and policy info
-            $headerGrid = New-Object System.Windows.Controls.Grid
-            [void]$headerGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "Auto" }))
-            [void]$headerGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "*" }))
-            [System.Windows.Controls.Grid]::SetRow($headerGrid, 0)
+            if (-not $baselineControl) {
+                Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.NoBaselineControlConfigFound -f $ControlType) -Source $MyInvocation.MyCommand.Name -Level "Warning"
+                return
+            }
 
-            # Create checkbox
-            $checkbox = New-Object System.Windows.Controls.CheckBox
-            $checkbox.Name = ($PolicyId.replace('.', '_') + "_AnnotationCheckbox")
-            $checkbox.VerticalAlignment = "Top"
-            $checkbox.Margin = "0,0,12,0"
-            [System.Windows.Controls.Grid]::SetColumn($checkbox, 0)
+            # Get baselines for this product
+            $baselines = $syncHash.UIConfigs.baselines.$ProductName
 
-            # Add global event handlers to dynamically created checkbox
-            Add-ControlEventHandlers -Control $checkbox
-
-            # Create policy info stack panel
-            $policyInfoStack = New-Object System.Windows.Controls.StackPanel
-            [System.Windows.Controls.Grid]::SetColumn($policyInfoStack, 1)
-
-            # Policy ID and name
-            $policyHeader = New-Object System.Windows.Controls.TextBlock
-            $policyHeader.Text = "$PolicyId`: $PolicyName"
-            $policyHeader.FontWeight = "SemiBold"
-            $policyHeader.Foreground = $syncHash.Window.FindResource("PrimaryBrush")
-            $policyHeader.TextWrapping = "Wrap"
-            $policyHeader.Margin = "0,0,0,4"
-            [void]$policyInfoStack.Children.Add($policyHeader)
-
-            # Add cursor and click handler to policy header
-            $policyHeader.Cursor = [System.Windows.Input.Cursors]::Hand
-            $policyHeader.Add_MouseLeftButtonDown({
-                # Navigate to checkbox: this -> policyInfoStack -> headerGrid -> checkbox (first child)
-                $headerGrid = $this.Parent.Parent
-                $checkbox = $headerGrid.Children[0]
-                $checkbox.IsChecked = -not $checkbox.IsChecked
-            }.GetNewClosure())
-
-            # Policy description
-            $policyDesc = New-Object System.Windows.Controls.TextBlock
-            $policyDesc.Text = $PolicyDescription
-            $policyDesc.FontSize = 11
-            $policyDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
-            $policyDesc.TextWrapping = "Wrap"
-            $policyDesc.Margin = "0,0,0,4"
-            [void]$policyInfoStack.Children.Add($policyDesc)
-
-            # Add elements to header grid
-            [void]$headerGrid.Children.Add($checkbox)
-            [void]$headerGrid.Children.Add($policyInfoStack)
-
-            # Create details panel (initially collapsed)
-            $detailsPanel = New-Object System.Windows.Controls.StackPanel
-            $detailsPanel.Visibility = "Collapsed"
-            $detailsPanel.Margin = "24,12,0,0"
-            [System.Windows.Controls.Grid]::SetRow($detailsPanel, 1)
-
-            # Comment label
-            $commentLabel = New-Object System.Windows.Controls.TextBlock
-            $commentLabel.Text = "Comment:"
-            $commentLabel.FontWeight = "SemiBold"
-            $commentLabel.Margin = "0,0,0,4"
-            [void]$detailsPanel.Children.Add($commentLabel)
-
-            # Comment TextBox
-            $commentTextBox = New-Object System.Windows.Controls.TextBox
-            $commentTextBox.Name = ($PolicyId.replace('.', '_') + "_Comment_TextBox")
-            $commentTextBox.Height = 80
-            $commentTextBox.TextWrapping = "Wrap"
-            $commentTextBox.AcceptsReturn = $true
-            $commentTextBox.VerticalScrollBarVisibility = "Auto"
-            $commentTextBox.Margin = "0,0,0,16"
-            [void]$detailsPanel.Children.Add($commentTextBox)
-
-            # Button panel
-            $buttonPanel = New-Object System.Windows.Controls.StackPanel
-            $buttonPanel.Orientation = "Horizontal"
-            $buttonPanel.Margin = "0,16,0,0"
-
-            # Save button
-            $saveButton = New-Object System.Windows.Controls.Button
-            $saveButton.Content = "Save Annotation"
-            $saveButton.Name = ($PolicyId.replace('.', '_') + "_SaveAnnotation")
-            $saveButton.Style = $syncHash.Window.FindResource("PrimaryButton")
-            $saveButton.HorizontalAlignment = "Left"
-            $saveButton.Width = 120
-            $saveButton.Height = 26
-            $saveButton.Margin = "0,0,10,0"
-
-            # Add global event handlers to dynamically created save button
-            Add-ControlEventHandlers -Control $saveButton
-
-            # Remove button (initially hidden)
-            $removeButton = New-Object System.Windows.Controls.Button
-            $removeButton.Content = "Remove Annotation"
-            $removeButton.Name = ($PolicyId.replace('.', '_') + "_RemoveAnnotation")
-            $removeButton.Style = $syncHash.Window.FindResource("PrimaryButton")
-            $removeButton.HorizontalAlignment = "Left"
-            $removeButton.Width = 120
-            $removeButton.Height = 26
-            $removeButton.Background = [System.Windows.Media.Brushes]::Red
-            $removeButton.Foreground = [System.Windows.Media.Brushes]::White
-            $removeButton.Cursor = [System.Windows.Input.Cursors]::Hand
-            $removeButton.Visibility = "Collapsed"
-
-            # Add global event handlers to dynamically created remove button
-            Add-ControlEventHandlers -Control $removeButton
-
-            [void]$buttonPanel.Children.Add($saveButton)
-            [void]$buttonPanel.Children.Add($removeButton)
-            [void]$detailsPanel.Children.Add($buttonPanel)
-
-            # Add elements to main grid
-            [void]$cardGrid.Children.Add($headerGrid)
-            [void]$cardGrid.Children.Add($detailsPanel)
-            $card.Child = $cardGrid
-
-            # Add checkbox event handler
-            $checkbox.Add_Checked({
-                $detailsPanel.Visibility = "Visible"
-            }.GetNewClosure())
-
-            $checkbox.Add_Unchecked({
-                $detailsPanel.Visibility = "Collapsed"
-            }.GetNewClosure())
-
-            # Updated Annotation Save Button Handler
-            $saveButton.Add_Click({
-                $policyIdWithUnderscores = $this.Name.Replace("_SaveAnnotation", "")
-                $policyId = $policyIdWithUnderscores.Replace("_", ".")
-
-                # Get the comment text
-                $commentTextBox = $this.Parent.Parent.Children | Where-Object { $_.Name -eq ($policyIdWithUnderscores + "_Comment_TextBox") }
-                $comment = $commentTextBox.Text
-
-                # Initialize product level if not exists
-                if (-not $syncHash.Annotations[$ProductName]) {
-                    $syncHash.Annotations[$ProductName] = @{}
+            if ($baselines -and $baselines.Count -gt 0) {
+                # Filter baselines based on the control type
+                $filteredBaselines = switch ($ControlType) {
+                    "Exclusions" {
+                        $baselines | Where-Object { $_.$($baselineControl.fieldControlName) -ne 'none' }
+                    }
+                    default {
+                        $baselines  # Omissions and Annotations use all baselines
+                    }
                 }
 
-                # Only create annotation if comment is not empty
-                if (![string]::IsNullOrWhiteSpace($comment)) {
-                    $syncHash.Annotations[$ProductName][$policyId] = @{
-                        Id = $policyId
-                        Product = $ProductName
-                        Comment = $comment.Trim()
+                if ($filteredBaselines -and $filteredBaselines.Count -gt 0) {
+                    foreach ($baseline in $filteredBaselines) {
+                        # Get the field list for this baseline
+                        $fieldList = if ($baseline.PSObject.Properties.Name -contains $baselineControl.fieldControlName) {
+                            $baseline.$($baselineControl.fieldControlName)
+                        } else {
+                            $baselineControl.defaultFields
+                        }
+
+                        # Get the output data hashtable dynamically
+                        $outputData = $syncHash.$($baselineControl.dataControlOutput)
+
+                        $card = New-FieldListCard `
+                            -CardName $baselineControl.tabName.Replace(' Policies', '').Replace('s', '') `
+                            -PolicyId $baseline.id `
+                            -ProductName $ProductName `
+                            -PolicyName $baseline.name `
+                            -PolicyDescription $baseline.rationale `
+                            -FieldList $fieldList `
+                            -OutputData $outputData `
+                            -ShowFieldType:$baselineControl.showFieldType `
+                            -ShowDescription:$baselineControl.showDescription
+
+                        if ($card) {
+                            [void]$Container.Children.Add($card)
+                        }
                     }
                 } else {
-
-                    if ($syncHash.Annotations[$ProductName]) {
-                        $syncHash.Annotations[$ProductName].Remove($policyId)
-                        # Remove product level if empty
-                        if ($syncHash.Annotations[$ProductName].Count -eq 0) {
-                            $syncHash.Annotations.Remove($ProductName)
-                            Write-DebugOutput -Message "Removed [$policyId] from product [$ProductName]" -Source $policyIdWithUnderscores -Level "Info"
-                        }
-                    }
-                }
-
-                [System.Windows.MessageBox]::Show("[$policyId] annotation saved successfully.", "Success", "OK", "Information")
-
-                # Make remove button visible and header bold
-                $removeButton.Visibility = "Visible"
-                $policyHeader.FontWeight = "Bold"
-
-                # collapse details panel
-                $detailsPanel.Visibility = "Collapsed"
-
-                #uncheck checkbox
-                $checkbox.IsChecked = $false
-            }.GetNewClosure())
-
-
-            # Updated Annotation Remove Button Handler
-            $removeButton.Add_Click({
-                $policyIdWithUnderscores = $this.Name.Replace("_RemoveAnnotation", "")
-                $policyId = $policyIdWithUnderscores.Replace("_", ".")
-
-                $result = [System.Windows.MessageBox]::Show("Are you sure you want to remove the annotation for [$policyId]?", "Confirm Remove", "YesNo", "Question")
-                if ($result -eq [System.Windows.MessageBoxResult]::Yes) {
-                    Write-DebugOutput -Message "User confirmed removal of annotation for policy: $policyId" -Source "User Action" -Level "Info"
-
-                    # Remove annotation from hashtable
-                    if ($syncHash.Annotations[$ProductName]) {
-                        $syncHash.Annotations[$ProductName].Remove($policyId)
-                        # Remove product level if empty
-                        if ($syncHash.Annotations[$ProductName].Count -eq 0) {
-                            $syncHash.Annotations.Remove($ProductName)
-                        }
-                    }
-
-                    # Clear comment textbox
-                    $commentTextBox = $this.Parent.Parent.Children | Where-Object { $_.Name -eq ($policyIdWithUnderscores + "_Comment_TextBox") }
-                    $commentTextBox.Text = ""
-
-                    [System.Windows.MessageBox]::Show("[$policyId] annotation removed successfully.", "Success", "OK", "Information")
-
-                    # Hide remove button and unbold header
-                    $this.Visibility = "Collapsed"
-
-                    #change weight of policy header
-                    $policyHeader.FontWeight = "SemiBold"
-
-                    #uncheck checkbox
-                    $checkbox.IsChecked = $false
-                }
-            }.GetNewClosure())
-
-            return $card
-        }#end Function : New-AnnotationCard
-
-        Function New-ProductAnnotations {
-            param(
-                [string]$ProductName,
-                [System.Windows.Controls.StackPanel]$Container
-            )
-
-            $Container.Children.Clear()
-
-            # Get baselines for this product
-            $baselines = $syncHash.UIConfigs.baselines.$ProductName | Select-Object id, name, rationale
-
-            if ($baselines -and $baselines.Count -gt 0) {
-                #TEST $baseline = $baselines[0]
-                foreach ($baseline in $baselines) {
-                    $card = New-AnnotationCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.rationale
-                    [void]$Container.Children.Add($card)
+                    # No applicable baselines
+                    $noDataText = New-Object System.Windows.Controls.TextBlock
+                    $noDataText.Text = $syncHash.UIConfigs.LocaleInfoMessages.NoPoliciesAvailable
+                    $noDataText.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
+                    $noDataText.FontStyle = "Italic"
+                    $noDataText.HorizontalAlignment = "Center"
+                    $noDataText.Margin = "0,50,0,0"
+                    [void]$Container.Children.Add($noDataText)
                 }
             } else {
-                # No baselines available
+                # No baselines available for this product
                 $noDataText = New-Object System.Windows.Controls.TextBlock
-                $noDataText.Text = "No policies available for annotation in this product."
+                $noDataText.Text = $syncHash.UIConfigs.LocaleInfoMessages.NoPoliciesAvailable
                 $noDataText.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
                 $noDataText.FontStyle = "Italic"
                 $noDataText.HorizontalAlignment = "Center"
@@ -1319,340 +1403,160 @@ Function Invoke-SCuBAConfigAppUI {
                 [void]$Container.Children.Add($noDataText)
             }
         }
-
         #===========================================================================
-        # OMISSIONS dynamic controls
+        # Dynamic controls - CARDS
         #===========================================================================
+        # Function to validate required fields
 
-        # Function to create an omission card UI element
-        Function New-OmissionCard {
+        Function Test-RequiredField {
+            <#
+            .SYNOPSIS
+            Validates required fields in a policy card details panel.
+            .DESCRIPTION
+            This function checks that all required fields in a policy configuration card have valid values before allowing the configuration to be saved.
+            #>
             param(
-                [string]$PolicyId,
-                [string]$ProductName,
-                [string]$PolicyName,
-                [string]$PolicyDescription
+                [System.Windows.Controls.StackPanel]$detailsPanel,
+                [array]$validInputFields,
+                [string]$policyId,
+                [string]$CardName
             )
 
-            # Create the main card border
-            $card = New-Object System.Windows.Controls.Border
-            $card.Style = $syncHash.Window.FindResource("Card")
-            $card.Margin = "0,0,0,12"
+            $missingRequiredFields = @()
 
-            # Create main grid for the card
-            $cardGrid = New-Object System.Windows.Controls.Grid
-            [void]$cardGrid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{ Height = "Auto" }))
-            [void]$cardGrid.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{ Height = "Auto" }))
+            # Function to search recursively for controls
+            function Find-ControlByName {
+                <#
+                .SYNOPSIS
+                Recursively searches for a control by name within a parent container.
+                .DESCRIPTION
+                This nested function traverses the visual tree to locate a control with a specific name.
+                #>
+                param($parent, $targetName)
 
-            # Create header with checkbox and policy info
-            $headerGrid = New-Object System.Windows.Controls.Grid
-            [void]$headerGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "Auto" }))
-            [void]$headerGrid.ColumnDefinitions.Add((New-Object System.Windows.Controls.ColumnDefinition -Property @{ Width = "*" }))
-            [System.Windows.Controls.Grid]::SetRow($headerGrid, 0)
-
-            # Create checkbox
-            $checkbox = New-Object System.Windows.Controls.CheckBox
-            $checkbox.Name = ($PolicyId.replace('.', '_') + "_OmissionCheckbox")
-            $checkbox.VerticalAlignment = "Top"
-            $checkbox.Margin = "0,0,12,0"
-            [System.Windows.Controls.Grid]::SetColumn($checkbox, 0)
-
-            # Add global event handlers to dynamically created checkbox
-            Add-ControlEventHandlers -Control $checkbox
-
-            # Create policy info stack panel
-            $policyInfoStack = New-Object System.Windows.Controls.StackPanel
-            [System.Windows.Controls.Grid]::SetColumn($policyInfoStack, 1)
-
-            # Policy ID and name
-            $policyHeader = New-Object System.Windows.Controls.TextBlock
-            $policyHeader.Text = "$PolicyId`: $PolicyName"
-            $policyHeader.FontWeight = "SemiBold"
-            $policyHeader.Foreground = $syncHash.Window.FindResource("PrimaryBrush")
-            $policyHeader.TextWrapping = "Wrap"
-            $policyHeader.Margin = "0,0,0,4"
-            [void]$policyInfoStack.Children.Add($policyHeader)
-
-            # Add cursor and click handler to policy header
-            $policyHeader.Cursor = [System.Windows.Input.Cursors]::Hand
-            $policyHeader.Add_MouseLeftButtonDown({
-                # Navigate to checkbox: this -> policyInfoStack -> headerGrid -> checkbox (first child)
-                $headerGrid = $this.Parent.Parent
-                $checkbox = $headerGrid.Children[0]
-                $checkbox.IsChecked = -not $checkbox.IsChecked
-            }.GetNewClosure())
-
-            # Policy description
-            $policyDesc = New-Object System.Windows.Controls.TextBlock
-            $policyDesc.Text = $PolicyDescription
-            $policyDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
-            $policyDesc.TextWrapping = "Wrap"
-            [void]$policyInfoStack.Children.Add($policyDesc)
-
-            # Add elements to header grid
-            [void]$headerGrid.Children.Add($checkbox)
-            [void]$headerGrid.Children.Add($policyInfoStack)
-
-            # Create details panel (initially collapsed)
-            $detailsPanel = New-Object System.Windows.Controls.StackPanel
-            $detailsPanel.Visibility = "Collapsed"
-            $detailsPanel.Margin = "24,12,0,0"
-            [System.Windows.Controls.Grid]::SetRow($detailsPanel, 1)
-
-            # Rationale section
-            $rationaleLabel = New-Object System.Windows.Controls.TextBlock
-            $rationaleLabel.Text = "Rationale (Required)"
-            $rationaleLabel.FontWeight = "SemiBold"
-            $rationaleLabel.Margin = "0,0,0,4"
-            [void]$detailsPanel.Children.Add($rationaleLabel)
-
-            $rationaleTextBox = New-Object System.Windows.Controls.TextBox
-            $rationaleTextBox.Name = ($PolicyId.replace('.', '_') + "_Rationale_TextBox")
-            $rationaleTextBox.Height = 60
-            $rationaleTextBox.AcceptsReturn = $true
-            $rationaleTextBox.TextWrapping = "Wrap"
-            $rationaleTextBox.VerticalScrollBarVisibility = "Auto"
-            $rationaleTextBox.Margin = "0,0,0,12"
-            [void]$detailsPanel.Children.Add($rationaleTextBox)
-
-            # Add global event handlers to dynamically created checkbox
-            Add-ControlEventHandlers -Control $rationaleTextBox
-
-            # Expiration date section
-            $expirationLabel = New-Object System.Windows.Controls.TextBlock
-            $expirationLabel.Text = "Expiration Date (Optional)"
-            $expirationLabel.FontWeight = "SemiBold"
-            $expirationLabel.Margin = "0,0,0,4"
-            [void]$detailsPanel.Children.Add($expirationLabel)
-
-            $expirationTextBox = New-Object System.Windows.Controls.TextBox
-            $expirationTextBox.Name = ($PolicyId.replace('.', '_') + "_Expiration_TextBox")
-            $expirationTextBox.Text = "mm/dd/yyyy"
-            $expirationTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-            $expirationTextBox.FontStyle = "Italic"
-            $expirationTextBox.Margin = "0,0,0,12"
-            $expirationTextBox.Width = 200
-            $expirationTextBox.VerticalContentAlignment = "Center"
-            $expirationTextBox.HorizontalAlignment = "Left"
-            [void]$detailsPanel.Children.Add($expirationTextBox)
-
-            # Add global event handlers to dynamically created expirationTextBox
-            Add-ControlEventHandlers -Control $expirationTextBox
-
-            # Add placeholder functionality for expiration date
-            $expirationTextBox.Add_GotFocus({
-                if ($this.Text -eq "mm/dd/yyyy") {
-                    $this.Text = ""
-                    $this.Foreground = [System.Windows.Media.Brushes]::Black
-                    $this.FontStyle = "Normal"
-                }
-            }.GetNewClosure())
-
-            $expirationTextBox.Add_LostFocus({
-                if ([string]::IsNullOrWhiteSpace($this.Text)) {
-                    $this.Text = "mm/dd/yyyy"
-                    $this.Foreground = [System.Windows.Media.Brushes]::Gray
-                    $this.FontStyle = "Italic"
-                }
-            }.GetNewClosure())
-
-             # Button panel
-            $buttonPanel = New-Object System.Windows.Controls.StackPanel
-            $buttonPanel.Orientation = "Horizontal"
-            $buttonPanel.Margin = "0,16,0,0"
-
-            # Save button
-            $saveButton = New-Object System.Windows.Controls.Button
-            $saveButton.Content = "Save Omission"
-            $saveButton.Name = ($PolicyId.replace('.', '_') + "_SaveOmission")
-            $saveButton.Style = $syncHash.Window.FindResource("PrimaryButton")
-            $saveButton.HorizontalAlignment = "Left"
-            $saveButton.Width = 120
-            $saveButton.Height = 26
-            $saveButton.Margin = "0,0,10,0"
-
-            # Remove button (initially hidden)
-            $removeButton = New-Object System.Windows.Controls.Button
-            $removeButton.Content = "Remove Omission"
-            $removeButton.Name = ($PolicyId.replace('.', '_') + "_RemoveOmission")
-            $removeButton.Style = $syncHash.Window.FindResource("PrimaryButton")
-            $removeButton.HorizontalAlignment = "Left"
-            $removeButton.Width = 120
-            $removeButton.Height = 26
-            $removeButton.Background = [System.Windows.Media.Brushes]::Red
-            $removeButton.Foreground = [System.Windows.Media.Brushes]::White
-            $removeButton.Cursor = [System.Windows.Input.Cursors]::Hand
-            $removeButton.Visibility = "Collapsed"
-
-            [void]$buttonPanel.Children.Add($saveButton)
-            [void]$buttonPanel.Children.Add($removeButton)
-            [void]$detailsPanel.Children.Add($buttonPanel)
-
-            # Add elements to main grid
-            [void]$cardGrid.Children.Add($headerGrid)
-            [void]$cardGrid.Children.Add($detailsPanel)
-            $card.Child = $cardGrid
-
-            # Add checkbox event handler
-            $checkbox.Add_Checked({
-                $detailsPanel = $this.Parent.Parent.Children | Where-Object { $_.GetType().Name -eq "StackPanel" }
-                $detailsPanel.Visibility = "Visible"
-            }.GetNewClosure())
-
-            $checkbox.Add_Unchecked({
-                $detailsPanel = $this.Parent.Parent.Children | Where-Object { $_.GetType().Name -eq "StackPanel" }
-                $detailsPanel.Visibility = "Collapsed"
-            }.GetNewClosure())
-
-            # Updated Omission Save Button Handler
-            $saveButton.Add_Click({
-
-                # Get the correct policy ID from the button name
-                $policyIdWithUnderscores = $this.Name.Replace("_SaveOmission", "")
-                $policyId = $policyIdWithUnderscores.Replace("_", ".")
-
-                # Since button is now in buttonPanel, we need to go up to detailsPanel
-                $detailsPanel = $this.Parent.Parent
-                $rationaleTextBox = $detailsPanel.Children | Where-Object { $_.Name -eq ($policyId.replace('.', '_') + "_Rationale_TextBox") }
-                $expirationTextBox = $detailsPanel.Children | Where-Object { $_.Name -eq ($policyId.replace('.', '_') + "_Expiration_TextBox") }
-
-                if ([string]::IsNullOrWhiteSpace($rationaleTextBox.Text)) {
-                    Write-DebugOutput -Message "User attempted to save omission for $policyId without rationale" -Source "User Action" -Level "Warning"
-                    [System.Windows.MessageBox]::Show("Rationale is required for policy omissions.", "Validation Error", "OK", "Warning")
-                    return
+                if ($parent.Name -eq $targetName) {
+                    return $parent
                 }
 
-                $expirationDate = $null
-                if ($expirationTextBox.Text -ne "mm/dd/yyyy" -and -not [string]::IsNullOrWhiteSpace($expirationTextBox.Text)) {
-                    try {
-                        $expirationDate = [DateTime]::Parse($expirationTextBox.Text).ToString("yyyy-MM-dd")
-                    }
-                    catch {
-                        Write-DebugOutput -Message "User entered invalid date format for $policyId expiration: $($expirationTextBox.Text)" -Source "User Action" -Level "Warning"
-                        Write-DebugOutput -Message "Error parsing expiration date for $policyId`: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
-                        [System.Windows.MessageBox]::Show("Invalid date format. Please use mm/dd/yyyy format.", "Validation Error", "OK", "Warning")
-                        return
+                if ($parent.Children) {
+                    foreach ($child in $parent.Children) {
+                        $result = Find-ControlByName -parent $child -targetName $targetName
+                        if ($result) { return $result }
                     }
                 }
 
-                # Initialize product level if not exists
-                if (-not $syncHash.Omissions[$ProductName]) {
-                    $syncHash.Omissions[$ProductName] = @{}
+                if ($parent.Content -and $parent.Content.Children) {
+                    foreach ($child in $parent.Content.Children) {
+                        $result = Find-ControlByName -parent $child -targetName $targetName
+                        if ($result) { return $result }
+                    }
                 }
 
-                Write-DebugOutput -Message "Saving omission for policy: $policyId with rationale: $($rationaleTextBox.Text)" -Source "User Action" -Level "Info"
-                # Add omission to hashtable
-                $syncHash.Omissions[$ProductName][$policyId] = @{
-                    Id = $policyId
-                    Product = $ProductName
-                    Rationale = $rationaleTextBox.Text
-                    Expiration = $expirationDate
+                if ($parent.Items) {
+                    foreach ($item in $parent.Items) {
+                        if ($item.Content -and $item.Content.Children) {
+                            foreach ($child in $item.Content.Children) {
+                                $result = Find-ControlByName -parent $child -targetName $targetName
+                                if ($result) { return $result }
+                            }
+                        }
+                    }
                 }
 
-                [System.Windows.MessageBox]::Show("[$policyId] omission saved successfully.", "Success", "OK", "Information")
+                return $null
+            }
 
-                #make remove button visible
-                $removeButton.Visibility = "Visible"
+            # Build dynamic placeholders list based on the fields we're actually validating
+            $dynamicPlaceholders = @("Enter value", "No date selected")  # Keep basic fallbacks
 
-                #make policy bold
-                $policyHeader.FontWeight = "Bold"
+            foreach ($inputData in $validInputFields) {
+                $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                if (-not $FieldListDef) { continue }
 
-                # collapse details panel
-                $detailsPanel.Visibility = "Collapsed"
-
-                #uncheck checkbox
-                $checkbox.IsChecked = $false
-            }.GetNewClosure())
-
-            # Updated Omission Remove Button Handler
-            $removeButton.Add_Click({
-                # Get the correct policy ID from the button name
-                $policyIdWithUnderscores = $this.Name.Replace("_RemoveOmission", "")
-                $policyId = $policyIdWithUnderscores.Replace("_", ".")
-
-                $result = [System.Windows.MessageBox]::Show("Are you sure you want to remove [$policyId] from omission?", "Confirm Remove", "YesNo", "Question")
-                if ($result -eq [System.Windows.MessageBoxResult]::Yes) {
-
-                    # Since button is now in buttonPanel, we need to go up to detailsPanel
-                    $detailsPanel = $this.Parent.Parent
-                    $rationaleTextBox = $detailsPanel.Children | Where-Object { $_.Name -eq ($policyId.replace('.', '_') + "_Rationale_TextBox") }
-                    $expirationTextBox = $detailsPanel.Children | Where-Object { $_.Name -eq ($policyId.replace('.', '_') + "_Expiration_TextBox") }
-
-                    if ($rationaleTextBox) {
-                        $rationaleTextBox.Text = ""
+                foreach ($field in $FieldListDef.fields) {
+                    # Add the specific placeholder for this field's valueType
+                    if ($syncHash.UIConfigs.valueValidations.($field.valueType)) {
+                        $fieldPlaceholder = $syncHash.UIConfigs.valueValidations.($field.valueType).sample
+                        if ($dynamicPlaceholders -notcontains $fieldPlaceholder) {
+                            $dynamicPlaceholders += $fieldPlaceholder
+                        }
                     }
-                    if ($expirationTextBox) {
-                        $expirationTextBox.Text = "mm/dd/yyyy"
-                        $expirationTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-                        $expirationTextBox.FontStyle = "Italic"
-                    }
+                }
+            }
 
-                    # Remove omission from hashtable
-                    if ($syncHash.Omissions[$ProductName]) {
-                        $syncHash.Omissions[$ProductName].Remove($policyId)
-                        # Remove product level if empty
-                        if ($syncHash.Omissions[$ProductName].Count -eq 0) {
-                            $syncHash.Omissions.Remove($ProductName)
+            Write-DebugOutput -Message ($syncHash.UIConfigs.localeVerboseMessages.DynamicPlaceholders -f ($dynamicPlaceholders -join ', ')) -Source "Test-RequiredField" -Level "Verbose"
+
+            foreach ($inputData in $validInputFields) {
+                $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                if (-not $FieldListDef) { continue }
+
+                foreach ($field in $FieldListDef.fields) {
+                    # Skip if field is not required
+                    if (-not $field.required) { continue }
+
+                    $controlFieldName = ($policyId.replace('.', '_') + "_" + $CardName + "_" + $field.value)
+                    $hasValue = $false
+
+                    Write-DebugOutput -Message ($syncHash.UIConfigs.localeVerboseMessages.RequiredFieldCheck -f $field.name, $controlFieldName) -Source "Test-RequiredField" -Level "Verbose"
+
+                    if ($field.type -eq "array") {
+                        # For arrays, check if list container has any items
+                        $listContainerName = ($controlFieldName + "_List")
+                        $listContainer = Find-ControlByName -parent $detailsPanel -targetName $listContainerName
+
+                        if ($listContainer -and $listContainer.Children.Count -gt 0) {
+                            $hasValue = $true
+                        }
+
+                    } elseif ($field.type -eq "boolean") {
+                        # Boolean fields always have a value (true or false)
+                        $hasValue = $true
+
+                    } elseif ($field.type -eq "dateString" -and $field.valueType -eq "yearmonthday") {
+                        # Check DatePicker for date fields
+                        $datePickerName = ($controlFieldName + "_DatePicker")
+                        $datePicker = Find-ControlByName -parent $detailsPanel -targetName $datePickerName
+
+                        if ($datePicker -and $datePicker.SelectedDate) {
+                            $hasValue = $true
+                        }
+
+                    } else {
+                        # For all other string-based fields, check TextBox
+                        $stringFieldName = ($controlFieldName + "_TextBox")
+                        $stringTextBox = Find-ControlByName -parent $detailsPanel -targetName $stringFieldName
+
+                        if ($stringTextBox -and ![string]::IsNullOrWhiteSpace($stringTextBox.Text)) {
+                            # Check if it's not a placeholder text using our dynamic list
+                            $currentText = $stringTextBox.Text.Trim()
+                            if ($dynamicPlaceholders -notcontains $currentText) {
+                                $hasValue = $true
+                            }
                         }
                     }
 
-                    [System.Windows.MessageBox]::Show("[$policyId] omission removed successfully.", "Success", "OK", "Information")
-
-                    # Hide the remove button
-                    $this.Visibility = "Collapsed"
-
-                    # Make policy header normal weight
-                    $policyHeader.FontWeight = "SemiBold"
-
-                    # collapse details panel
-                    $detailsPanel.Visibility = "Collapsed"
-
-                    #uncheck checkbox
-                    $checkbox.IsChecked = $false
+                    # If required field doesn't have a value, add to missing list
+                    if (-not $hasValue) {
+                        $missingRequiredFields += $field.name
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RequiredFieldMissing -f $field.name) -Source "Test-RequiredField" -Level "Warning"
+                    } else {
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.localeVerboseMessages.RequiredFieldHasValue -f $field.name) -Source "Test-RequiredField" -Level "Verbose"
+                    }
                 }
-            }.GetNewClosure())
-
-            return $card
-        }#end Function : New-OmissionCard
-
-        # Function to populate omissions for a product
-        Function New-ProductOmissions {
-            param(
-                [string]$ProductName,
-                [System.Windows.Controls.StackPanel]$Container
-            )
-
-            $Container.Children.Clear()
-
-            # Get baselines for this product
-            $baselines = $syncHash.UIConfigs.baselines.$ProductName | Select-Object id, name, rationale
-
-            if ($baselines -and $baselines.Count -gt 0) {
-                #TEST $baseline = $baselines[0]
-                foreach ($baseline in $baselines) {
-                    $card = New-OmissionCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.rationale
-                    [void]$Container.Children.Add($card)
-                }
-            } else {
-                # No baselines available
-                $noDataText = New-Object System.Windows.Controls.TextBlock
-                $noDataText.Text = "No policies available for omission in this product."
-                $noDataText.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
-                $noDataText.FontStyle = "Italic"
-                $noDataText.HorizontalAlignment = "Center"
-                $noDataText.Margin = "0,50,0,0"
-                [void]$Container.Children.Add($noDataText)
             }
+
+            return $missingRequiredFields
         }
-
-        #===========================================================================
-        # EXCLUSIONS dynamic controls
-        #===========================================================================
-
-        # Function to create exclusion field UI based on field type and valueType
-        Function New-ExclusionFieldControl {
+        Function New-FieldListControl {
+            <#
+            .SYNOPSIS
+            Creates a dynamic field list control for policy configurations.
+            .DESCRIPTION
+            This function generates interactive UI controls for managing lists of field values in policy configurations.
+            #>
             param(
+                [string]$ControlName,
                 [string]$PolicyId,
-                [string]$ExclusionTypeName,
                 [object]$Field,
                 [System.Windows.Controls.StackPanel]$Container
             )
@@ -1660,7 +1564,7 @@ Function Invoke-SCuBAConfigAppUI {
             $fieldPanel = New-Object System.Windows.Controls.StackPanel
             $fieldPanel.Margin = "0,0,0,12"
 
-            # Field label
+            # Field label - USE field.name for UI display
             $fieldLabel = New-Object System.Windows.Controls.TextBlock
             $fieldLabel.Text = $Field.name
             $fieldLabel.FontWeight = "SemiBold"
@@ -1676,7 +1580,8 @@ Function Invoke-SCuBAConfigAppUI {
             $fieldDesc.TextWrapping = "Wrap"
             [void]$fieldPanel.Children.Add($fieldDesc)
 
-            $fieldName = ($PolicyId.replace('.', '_') + "_" + $ExclusionTypeName + "_" + $Field.name)
+            # Use field.value for control naming (for data storage)
+            $fieldName = ($PolicyId.replace('.', '_') + "_" + $ControlName + "_" + $Field.value)
 
             if ($Field.type -eq "array") {
                 # Create array input with add/remove functionality
@@ -1691,26 +1596,28 @@ Function Invoke-SCuBAConfigAppUI {
                 $inputTextBox = New-Object System.Windows.Controls.TextBox
                 $inputTextBox.Name = $fieldName + "_TextBox"
                 $inputTextBox.Width = 250
-                $inputTextBox.Height = 26
+                $inputTextBox.Height = 28
                 $inputTextBox.VerticalContentAlignment = "Center"
                 $inputTextBox.Margin = "0,0,8,0"
+                $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                $inputTextBox.FontStyle = "Italic"
 
-                # Set placeholder based on valueType
-                switch ($Field.valueType) {
-                    "email" { $inputTextBox.Text = "user@domain.com"; $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray; $inputTextBox.FontStyle = "Italic" }
-                    "guid" { $inputTextBox.Text = "12345678-1234-1234-1234-123456789abc"; $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray; $inputTextBox.FontStyle = "Italic" }
-                    "domain" { $inputTextBox.Text = "example.com"; $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray; $inputTextBox.FontStyle = "Italic" }
-                    "string" { $inputTextBox.Text = "Enter value"; $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray; $inputTextBox.FontStyle = "Italic" }
-                    default { $inputTextBox.Text = "Enter value"; $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray; $inputTextBox.FontStyle = "Italic" }
+                # Set placeholder text based on field type using valueValidations
+                $placeholderText = if ($syncHash.UIConfigs.valueValidations.($Field.valueType)) {
+                    $syncHash.UIConfigs.valueValidations.($Field.valueType).sample
+                } else {
+                    "Enter value"  # fallback if valueType not found
                 }
 
-                # Add global event handlers to dynamically created inputTextBox
-                Add-ControlEventHandlers -Control $inputTextBox
+                $inputTextBox.Text = $placeholderText
 
-                # Placeholder functionality
-                $placeholder = $inputTextBox.Text
+                # Add global event handlers to dynamically created inputTextBox
+                Add-ControlEventHandler -Control $inputTextBox
+
+                # placeholder functionality - capture placeholder in closure properly
                 $inputTextBox.Add_GotFocus({
-                    if ($this.Text -eq $placeholder) {
+                    #param($sender, $e)
+                    if ($this.Text -eq $placeholderText) {
                         $this.Text = ""
                         $this.Foreground = [System.Windows.Media.Brushes]::Black
                         $this.FontStyle = "Normal"
@@ -1718,8 +1625,9 @@ Function Invoke-SCuBAConfigAppUI {
                 }.GetNewClosure())
 
                 $inputTextBox.Add_LostFocus({
+                    #param($sender, $e)
                     if ([string]::IsNullOrWhiteSpace($this.Text)) {
-                        $this.Text = $placeholder
+                        $this.Text = $placeholderText
                         $this.Foreground = [System.Windows.Media.Brushes]::Gray
                         $this.FontStyle = "Italic"
                     }
@@ -1730,7 +1638,7 @@ Function Invoke-SCuBAConfigAppUI {
                 $addButton.Name = $fieldName + "_Add"
                 $addButton.Style = $syncHash.Window.FindResource("PrimaryButton")
                 $addButton.Width = 60
-                $addButton.Height = 26
+                $addButton.Height = 28
 
                 [void]$inputRow.Children.Add($inputTextBox)
                 [void]$inputRow.Children.Add($addButton)
@@ -1741,31 +1649,37 @@ Function Invoke-SCuBAConfigAppUI {
                 $listContainer.Name = $fieldName + "_List"
                 [void]$arrayContainer.Children.Add($listContainer)
 
-                Add-ControlEventHandlers -Control $addButton
+                Add-ControlEventHandler -Control $addButton
 
-                # Register the listContainer in syncHash for data collection
-                #syncHash.$fieldName = $listContainer
-
-                # Add button functionality
+                # add button functionality - capture placeholder properly
                 $addButton.Add_Click({
                     $inputBox = $this.Parent.Children[0]
                     $listPanel = $this.Parent.Parent.Children[1]
 
-                    if (![string]::IsNullOrWhiteSpace($inputBox.Text) -and $inputBox.Text -ne $placeholder) {
+                    if (![string]::IsNullOrWhiteSpace($inputBox.Text) -and $inputBox.Text -ne $placeholderText) {
                         # Trim the input value
                         $trimmedValue = $inputBox.Text.Trim()
 
-                        If($listContainer.Children.Children | Where-Object { $_.Text -contains $trimmedValue }) {
-                            # User already exists, skip
+                        # Check if value already exists
+                        if ($listContainer.Children.Children | Where-Object { $_.Text -contains $trimmedValue }) {
+                            [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.DuplicateEntry, "Duplicate Entry", "OK", "Warning")
                             return
                         }
 
-                        # Validate input based on valueType
+                        # Validate input based on valueType using valueValidations
                         $isValid = $true
-                        switch ($Field.valueType) {
-                            "email" { $isValid = $trimmedValue -match "^[^\s@]+@[^\s@]+\.[^\s@]+$" }
-                            "guid" { $isValid = $trimmedValue -match "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" }
-                            "domain" { $isValid = $trimmedValue -match "^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.([a-zA-Z]{2,})+$" }
+                        $errorMessage = ""
+
+                        if ($syncHash.UIConfigs.valueValidations.($Field.valueType)) {
+                            $validation = $syncHash.UIConfigs.valueValidations.($Field.valueType)
+                            if ($validation.pattern) {
+                                $isValid = $trimmedValue -match $validation.pattern
+                                $errorMessage = ($syncHash.UIConfigs.localeErrorMessages.InvalidFieldFormat -f $Field.valueType, $validation.sample)
+                            }
+                        } else {
+                            # Fallback for unknown types
+                            $isValid = $trimmedValue.Length -gt 0
+                            $errorMessage = $syncHash.UIConfigs.localeErrorMessages.InvalidFieldValue
                         }
 
                         if ($isValid) {
@@ -1797,234 +1711,303 @@ Function Invoke-SCuBAConfigAppUI {
                             [void]$itemRow.Children.Add($removeButton)
                             [void]$listPanel.Children.Add($itemRow)
 
-                            # Clear input
-                            $inputBox.Text = $placeholder
+                            # Clear input - use captured placeholder
+                            $inputBox.Text = $placeholderText
                             $inputBox.Foreground = [System.Windows.Media.Brushes]::Gray
                             $inputBox.FontStyle = "Italic"
                         } else {
-                            [System.Windows.MessageBox]::Show("Invalid $($Field.valueType) format.", "Validation Error", "OK", "Warning")
+                            [System.Windows.MessageBox]::Show($errorMessage, "Validation Error", "OK", "Warning")
                         }
                     }
                 }.GetNewClosure())
 
+                # Add input row and list container to field panel
                 [void]$fieldPanel.Children.Add($arrayContainer)
 
-            } elseif ($Field.type -eq "string") {
-                # Create single string input
-                $stringTextBox = New-Object System.Windows.Controls.TextBox
-                $stringTextBox.Name = $fieldName + "_TextBox"
-                $stringTextBox.Width = 400
-                $stringTextBox.Height = 26
-                $stringTextBox.VerticalContentAlignment = "Center"
+            } elseif ($Field.type -eq "boolean") {
+                # Create boolean checkbox control
+                $booleanCheckBox = New-Object System.Windows.Controls.CheckBox
+                $booleanCheckBox.Name = $fieldName + "_CheckBox"
+                $booleanCheckBox.Content = "Enable this setting"
+                $booleanCheckBox.Margin = "0,4,0,0"
+                $booleanCheckBox.IsChecked = $false
 
-                if ($Field.valueType -eq "semicolonList") {
-                    $stringTextBox.Text = "user1@domain.com;user2@domain.com"
+                # Add global event handlers to dynamically created checkbox
+                Add-ControlEventHandler -Control $booleanCheckBox
+
+                [void]$fieldPanel.Children.Add($booleanCheckBox)
+
+            } elseif ($Field.type -match "string") {
+
+                switch($Field.type){
+                    "string" {
+                        $stringTextBox = New-Object System.Windows.Controls.TextBox
+                        $stringTextBox.Name = $fieldName + "_TextBox"
+                        $stringTextBox.HorizontalAlignment = "Left"
+                        $stringTextBox.Width = 400
+                        $stringTextBox.Height = 28
+                        $stringTextBox.VerticalContentAlignment = "Center"
+                    }
+                    "longstring" {
+                        $stringTextBox = New-Object System.Windows.Controls.TextBox
+                        $stringTextBox.Name = $fieldName + "_TextBox"
+                        $stringTextBox.HorizontalAlignment = "Left"
+                        $stringTextBox.Width = 500
+                        $stringTextBox.Height = 80
+                        $stringTextBox.AcceptsReturn = $true
+                        $stringTextBox.TextWrapping = "Wrap"
+                        $stringTextBox.VerticalScrollBarVisibility = "Auto"
+                        $stringTextBox.VerticalContentAlignment = "Top"
+                        $stringTextBox.Margin = "0,0,0,8"
+                    }
+                    "dateString" {
+                        # Set placeholder text for string fields using valueValidations
+                        $stringPlaceholder = if ($syncHash.UIConfigs.valueValidations.($Field.valueType)) {
+                            $syncHash.UIConfigs.valueValidations.($Field.valueType).sample
+                        } else {
+                            "Enter value"  # fallback
+                        }
+
+                        # Create a horizontal stack panel for date picker and text box
+                        $datePanel = New-Object System.Windows.Controls.StackPanel
+                        $datePanel.Orientation = "Horizontal"
+                        $datePanel.HorizontalAlignment = "Left"
+
+                        # Create DatePicker
+                        $datePicker = New-Object System.Windows.Controls.DatePicker
+                        $datePicker.Name = $fieldName + "_DatePicker"
+                        $datePicker.Width = 150
+                        $datePicker.Height = 28
+                        $datePicker.Margin = "0,0,8,0"
+                        $datePicker.SelectedDateFormat = "Short"
+
+                        # Add global event handlers to dynamically created DatePicker
+                        Add-ControlEventHandler -Control $datePicker
+
+                        # Create a "Clear" button next to the DatePicker
+                        $clearButton = New-Object System.Windows.Controls.Button
+                        $clearButton.Content = "Clear"
+                        $clearButton.Name = $fieldName + "_ClearDate"
+                        $clearButton.Width = 50
+                        $clearButton.Height = 28
+                        $clearButton.Margin = "0,0,8,0"
+
+                        # Add global event handlers to dynamically created clear button
+                        Add-ControlEventHandler -Control $clearButton
+
+                        # Clear button functionality
+                        $clearButton.Add_Click({
+                            # Find the DatePicker (previous sibling)
+                            $parentPanel = $this.Parent
+                            $datePicker = $parentPanel.Children[0]
+                            $datePicker.SelectedDate = $null
+                        }.GetNewClosure())
+
+                        # Optional: Add a readonly TextBox to show the formatted date
+                        $stringTextBox = New-Object System.Windows.Controls.TextBox
+                        $stringTextBox.Name = $fieldName + "_TextBox"
+                        $stringTextBox.Width = 120
+                        $stringTextBox.Height = 28
+                        $stringTextBox.IsReadOnly = $true
+                        $stringTextBox.Text = "No date selected"
+                        $stringTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                        $stringTextBox.FontStyle = "Italic"
+
+                        # Update text box when date picker changes
+                        $datePicker.Add_SelectedDateChanged({
+                            $parentPanel = $this.Parent
+                            $textBox = $parentPanel.Children | Where-Object { $_.Name -like "*_TextBox" }
+                            if ($this.SelectedDate) {
+                                # Format as yyyy-MM-dd for YAML output
+                                $formattedDate = $this.SelectedDate.ToString($syncHash.UIConfigs.valueValidations.($Field.valueType).format)
+                                $textBox.Text = $formattedDate
+                                $textBox.Foreground = [System.Windows.Media.Brushes]::Black
+                                $textBox.FontStyle = "Normal"
+                            } else {
+                                $textBox.Text = "No date selected"
+                                $textBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                                $textBox.FontStyle = "Italic"
+                            }
+                        }.GetNewClosure())
+
+                        # Add controls to the date panel
+                        [void]$datePanel.Children.Add($datePicker)
+                        [void]$datePanel.Children.Add($clearButton)
+                        [void]$datePanel.Children.Add($stringTextBox)
+
+                        # Add the date panel to the field panel instead of individual textbox
+                        [void]$fieldPanel.Children.Add($datePanel)
+
+                        # Skip the normal textbox creation for dateString
+                        continue
+                    }
+                }
+
+                # Only add the regular textbox if we didn't create a date panel
+                if ($Field.type -ne "dateString") {
+                    # placeholder text for string fields using valueValidations
+                    $stringPlaceholder = if ($syncHash.UIConfigs.valueValidations.($Field.valueType)) {
+                        $syncHash.UIConfigs.valueValidations.($Field.valueType).sample
+                    } else {
+                        "Enter value"  # fallback if valueType not found in config
+                    }
+
+                    $stringTextBox.Text = $stringPlaceholder
                     $stringTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
                     $stringTextBox.FontStyle = "Italic"
 
+                    # string field placeholder functionality
                     $stringTextBox.Add_GotFocus({
-                        if ($this.Text -eq "user1@domain.com;user2@domain.com") {
+                        #param($sender, $e)
+                        if ($this.Text -eq $stringPlaceholder) {
                             $this.Text = ""
                             $this.Foreground = [System.Windows.Media.Brushes]::Black
                             $this.FontStyle = "Normal"
                         }
-                    })
+                    }.GetNewClosure())
 
                     $stringTextBox.Add_LostFocus({
+                        #param($sender, $e)
                         if ([string]::IsNullOrWhiteSpace($this.Text)) {
-                            $this.Text = "user1@domain.com;user2@domain.com"
+                            $this.Text = $stringPlaceholder
                             $this.Foreground = [System.Windows.Media.Brushes]::Gray
                             $this.FontStyle = "Italic"
                         }
-                    })
+                    }.GetNewClosure())
+
+                    # Add global event handlers to dynamically created stringTextBox
+                    Add-ControlEventHandler -Control $stringTextBox
+                    [void]$fieldPanel.Children.Add($stringTextBox)
                 }
-                # Add global event handlers to dynamically created stringTextBox
-                Add-ControlEventHandlers -Control $stringTextBox
-                [void]$fieldPanel.Children.Add($stringTextBox)
             }
 
-            If($syncHash.GraphConnected)
-            {
-                if ($Field.name -eq "Users") {
-                    $getUsersButton = New-Object System.Windows.Controls.Button
-                    $getUsersButton.Content = "Get Users"
-                    $getUsersButton.Width = 80
-                    $getUsersButton.Height = 26
-                    $getUsersButton.Margin = "8,0,0,0"
+            # Add Graph connectivity buttons for those that match the field value
+            if ($syncHash.GraphConnected -and ($Field.value -in $syncHash.UIConfigs.graphQueries.Psobject.properties.name) ) {
+                $GraphQueryData = ($syncHash.UIConfigs.graphQueries.PSObject.Properties | Where-Object { $_.Name -eq $Field.value }).Value
 
-                    $getUsersButton.Add_Click({
-                        try {
-                            # Get search term from input box
-                            $searchTerm = if ($inputTextBox.Text -ne $placeholder -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
+                $graphGetButton = New-Object System.Windows.Controls.Button
+                $graphGetButton.Content = "Get $($GraphQueryData.Name)"
+                $graphGetButton.Width = 100
+                $graphGetButton.Height = 28
+                $graphGetButton.Margin = "8,0,0,0"
 
-                            # Show user selector
-                            $selectedUsers = Show-UserSelector -SearchTerm $searchTerm
+                # Add global event handlers to dynamically created graphGetButton
+                Add-ControlEventHandler -Control $graphGetButton
 
-                            if ($selectedUsers -and $selectedUsers.Count -gt 0) {
-                                # Clear existing items
-                                #$listContainer.Children.Clear()
+                $graphGetButton.Add_Click({
+                    try {
+                        # Get search term from input box
+                        $searchTerm = if ($inputTextBox.Text -ne $placeholderText -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
 
+                        $selectedItems = Show-GraphSelector -GraphEntityType $GraphQueryData.Name -SearchTerm $searchTerm
 
-                                # Add selected users to the list
-                                foreach ($user in $selectedUsers) {
-                                    #check if group already exists in the list
-                                    If ($listContainer.Children.Children | Where-Object { $_.Text -contains $user.Id }) {
-                                        # User already exists, skip
-                                        return
-                                    }
-                                    $userItem = New-Object System.Windows.Controls.StackPanel
-                                    $userItem.Orientation = "Horizontal"
-                                    $userItem.Margin = "0,2,0,2"
-
-                                    $userText = New-Object System.Windows.Controls.TextBlock
-                                    $userText.Text = "$($user.id)"
-                                    $userText.Width = 250
-                                    $userText.VerticalAlignment = "Center"
-                                    $userText.ToolTip = "$($user.DisplayName) ($($user.UserPrincipalName))"
-
-                                    $removeUserButton = New-Object System.Windows.Controls.Button
-                                    $removeUserButton.Content = "Remove"
-                                    $removeUserButton.Width = 60
-                                    $removeUserButton.Height = 20
-                                    $removeUserButton.Margin = "8,0,0,0"
-                                    $removeUserButton.FontSize = 10
-                                    $removeUserButton.Background = [System.Windows.Media.Brushes]::Red
-                                    $removeUserButton.Foreground = [System.Windows.Media.Brushes]::White
-                                    $removeUserButton.BorderThickness = "0"
-
-                                    $removeUserButton.Add_Click({
-                                        $parentItem = $this.Parent
-                                        $parentContainer = $parentItem.Parent
-                                        $parentContainer.Children.Remove($parentItem)
-                                    }.GetNewClosure())
-
-                                    [void]$userItem.Children.Add($userText)
-                                    [void]$userItem.Children.Add($removeUserButton)
-                                    [void]$listContainer.Children.Add($userItem)
-
+                        if ($selectedItems -and $selectedItems.Count -gt 0) {
+                            # Add selected users to the list
+                            foreach ($item in $selectedItems) {
+                                # Check if user already exists in the list
+                                if ($listContainer.Children.Children | Where-Object { $_.Text -contains $item.Id }) {
+                                    continue
                                 }
 
-                                # Clear the input box
-                                $inputTextBox.Text = $placeholder
-                                $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-                                $inputTextBox.FontStyle = "Italic"
+                                # Create item panel
+                                $itemPanel = New-Object System.Windows.Controls.StackPanel
+                                $itemPanel.Orientation = "Horizontal"
+                                $itemPanel.Margin = "0,2,0,2"
 
-                                Write-DebugOutput -Message "Added $($selectedUsers.Count) users to exclusion list"
+                                # Create item text block
+                                $itemText = New-Object System.Windows.Controls.TextBlock
+                                $itemText.Text = "$($item.($GraphQueryData.outProperty))"
+                                $itemText.Width = 250
+                                $itemText.VerticalAlignment = "Center"
+                                $itemText.ToolTip = "$($item.($GraphQueryData.tipProperty))"
+
+                                # Create remove button
+                                $removeUserButton = New-Object System.Windows.Controls.Button
+                                $removeUserButton.Content = "Remove"
+                                $removeUserButton.Width = 60
+                                $removeUserButton.Height = 20
+                                $removeUserButton.Margin = "8,0,0,0"
+                                $removeUserButton.FontSize = 10
+                                $removeUserButton.Background = [System.Windows.Media.Brushes]::Red
+                                $removeUserButton.Foreground = [System.Windows.Media.Brushes]::White
+                                $removeUserButton.BorderThickness = "0"
+
+                                $removeUserButton.Add_Click({
+                                    $parentItem = $this.Parent
+                                    $parentContainer = $parentItem.Parent
+                                    $parentContainer.Children.Remove($parentItem)
+                                }.GetNewClosure())
+
+                                [void]$itemPanel.Children.Add($itemText)
+                                [void]$itemPanel.Children.Add($removeUserButton)
+                                [void]$listContainer.Children.Add($itemPanel)
                             }
+
+                            # Clear the input box
+                            $inputTextBox.Text = $placeholderText
+                            $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                            $inputTextBox.FontStyle = "Italic"
+
+                            Write-DebugOutput -Message "Added $($selectedUsers.Count) $($Field.value.ToLower()) to $ControlName list" -Source $MyInvocation.MyCommand.Name -Level "Info"
                         }
-                        catch {
-                            Write-DebugOutput -Message "Error selecting users: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
-                            [System.Windows.MessageBox]::Show("Error selecting users: $($_.Exception.Message)", "Error",
-                                                            [System.Windows.MessageBoxButton]::OK,
-                                                            [System.Windows.MessageBoxImage]::Error)
-                        }
-                    }.GetNewClosure())
+                    }
+                    catch {
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.FieldSelectionError -f $Field.value.ToLower(), $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"
+                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.FieldSelectionError -f $Field.value.ToLower(), "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+                    }
+                }.GetNewClosure())
 
-                    [void]$inputRow.Children.Add($getUsersButton)
-                }
-
-                # Check if field is for groups
-                elseif ($Field.name -eq "Groups") {
-                    $getGroupsButton = New-Object System.Windows.Controls.Button
-                    $getGroupsButton.Content = "Get Groups"
-                    $getGroupsButton.Width = 80
-                    $getGroupsButton.Height = 26
-                    $getGroupsButton.Margin = "8,0,0,0"
-
-                    $getGroupsButton.Add_Click({
-                        try {
-                            # Get search term from input box
-                            $searchTerm = if ($inputTextBox.Text -ne $placeholder -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
-
-                            # Show group selector
-                            $selectedGroups = Show-GroupSelector -SearchTerm $searchTerm
-
-                            if ($selectedGroups -and $selectedGroups.Count -gt 0) {
-                                # Clear existing items
-                                #$listContainer.Children.Clear()
-
-                                # Add selected groups to the list
-                                foreach ($group in $selectedGroups)
-                                {
-                                    #check if group already exists in the list
-                                    If ($listContainer.Children.Children | Where-Object { $_.Text -contains $group.Id }) {
-                                        # User already exists, skip
-                                        Return
-
-                                    }
-                                    $groupItem = New-Object System.Windows.Controls.StackPanel
-                                    $groupItem.Orientation = "Horizontal"
-                                    $groupItem.Margin = "0,2,0,2"
-
-                                    $groupText = New-Object System.Windows.Controls.TextBlock
-                                    $groupText.Text = "$($group.Id)"
-                                    $groupText.Width = 250
-                                    $groupText.VerticalAlignment = "Center"
-                                    $groupText.ToolTip = "$($group.DisplayName)"
-
-                                    $removeGroupButton = New-Object System.Windows.Controls.Button
-                                    $removeGroupButton.Content = "Remove"
-                                    $removeGroupButton.Width = 60
-                                    $removeGroupButton.Height = 20
-                                    $removeGroupButton.Margin = "8,0,0,0"
-                                    $removeGroupButton.FontSize = 10
-                                    $removeGroupButton.Background = [System.Windows.Media.Brushes]::Red
-                                    $removeGroupButton.Foreground = [System.Windows.Media.Brushes]::White
-                                    $removeGroupButton.BorderThickness = "0"
-
-                                    $removeGroupButton.Add_Click({
-                                        $parentItem = $this.Parent
-                                        $parentContainer = $parentItem.Parent
-                                        $parentContainer.Children.Remove($parentItem)
-                                    }.GetNewClosure())
-
-                                    [void]$groupItem.Children.Add($groupText)
-                                    [void]$groupItem.Children.Add($removeGroupButton)
-                                    [void]$listContainer.Children.Add($groupItem)
-
-
-                                }
-
-                                # Clear the input box
-                                $inputTextBox.Text = $placeholder
-                                $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-                                $inputTextBox.FontStyle = "Italic"
-
-                                Write-DebugOutput -Message "Added $($selectedGroups.Count) groups to exclusion list" -Source $MyInvocation.MyCommand.Name -Level "Info"
-                            }
-                        }
-                        catch {
-                            Write-DebugOutput -Message "Error selecting groups: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
-                            [System.Windows.MessageBox]::Show("Error selecting groups: $($_.Exception.Message)", "Error",
-                                                            [System.Windows.MessageBoxButton]::OK,
-                                                            [System.Windows.MessageBoxImage]::Error)
-                        }
-                    }.GetNewClosure())
-
-                    [void]$inputRow.Children.Add($getGroupsButton)
-                }
+                [void]$inputRow.Children.Add($graphGetButton)
             }
             [void]$Container.Children.Add($fieldPanel)
         }
 
-        # Function to create an exclusion card UI element
-        Function New-ExclusionCard {
+        # Updated Function to create a field card UI element that handles multiple fields
+        Function New-FieldListCard {
+            <#
+            .SYNOPSIS
+            Creates a comprehensive field card UI element for policy configuration.
+            .DESCRIPTION
+            This function generates a complete card interface with checkboxes, input fields, tabs, and buttons for configuring multiple field types within policy settings including exclusions, omissions, and annotations.
+            #>
             param(
+                [string]$CardName,
                 [string]$PolicyId,
                 [string]$ProductName,
                 [string]$PolicyName,
                 [string]$PolicyDescription,
-                [string]$ExclusionType
+                [string[]]$FieldList,  # Can be string or array
+                $OutputData,
+                [switch]$ShowFieldType,
+                [switch]$ShowDescription
             )
 
-            # Skip if exclusion type is "none"
-            if ($ExclusionType -eq "none") {
+            # Handle both string and array inputs for FieldLists
+            $inputFields = @()
+            if ($FieldList -is [array]) {
+                $inputFields = $FieldList
+            } else {
+                $inputFields = @($FieldList)
+            }
+
+            # Skip if inputField is "none" or empty
+            if ($inputFields -contains "none" -or $inputFields.Count -eq 0) {
                 return $null
             }
 
-            # Get exclusion type definition from config
-            $exclusionTypeDef = $syncHash.UIConfigs.exclusionTypes.$ExclusionType
-            if (-not $exclusionTypeDef) {
+            # Validate all inputFields exist
+            $validInputFields = @()
+            foreach ($inputData in $inputFields) {
+                $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                if ($FieldListDef) {
+                    $validInputFields += $inputData
+                } else {
+                    Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.InputDataNotFound -f $inputData) -Source "New-FieldListCard" -Level "Verbose"
+                }
+            }
+
+            # Return null if no valid inputFields found
+            if ($validInputFields.Count -eq 0) {
                 return $null
             }
 
@@ -2046,13 +2029,13 @@ Function Invoke-SCuBAConfigAppUI {
 
             # Create checkbox
             $checkbox = New-Object System.Windows.Controls.CheckBox
-            $checkbox.Name = ($PolicyId.replace('.', '_') + "_ExclusionCheckbox")
+            $checkbox.Name = ($PolicyId.replace('.', '_') + "_" + $CardName + "_FieldListCheckbox")
             $checkbox.VerticalAlignment = "Top"
             $checkbox.Margin = "0,0,12,0"
             [System.Windows.Controls.Grid]::SetColumn($checkbox, 0)
 
             # Add global event handlers to dynamically created checkbox
-            Add-ControlEventHandlers -Control $checkbox
+            Add-ControlEventHandler -Control $checkbox
 
             # Create policy info stack panel
             $policyInfoStack = New-Object System.Windows.Controls.StackPanel
@@ -2076,13 +2059,32 @@ Function Invoke-SCuBAConfigAppUI {
                 $checkbox.IsChecked = -not $checkbox.IsChecked
             }.GetNewClosure())
 
-            # Exclusion type info
-            $exclusionTypeHeader = New-Object System.Windows.Controls.TextBlock
-            $exclusionTypeHeader.Text = "Exclusion Type: $($exclusionTypeDef.name)"
-            $exclusionTypeHeader.FontSize = 12
-            $exclusionTypeHeader.Foreground = $syncHash.Window.FindResource("AccentBrush")
-            $exclusionTypeHeader.Margin = "0,0,0,4"
-            [void]$policyInfoStack.Children.Add($exclusionTypeHeader)
+            If($ShowDescription){
+                # Policy description
+                $policyDesc = New-Object System.Windows.Controls.TextBlock
+                $policyDesc.Text = $PolicyDescription
+                $policyDesc.FontSize = 11
+                $policyDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
+                $policyDesc.TextWrapping = "Wrap"
+                [void]$policyInfoStack.Children.Add($policyDesc)
+            }
+
+            If($ShowFieldType){
+                 # Field types info (show all available fields)
+                $FieldLists = @()
+                foreach ($inputData in $validInputFields) {
+                    $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                    if ($FieldListDef) {
+                        $FieldLists += $FieldListDef.name
+                    }
+                }
+                $FieldListHeader = New-Object System.Windows.Controls.TextBlock
+                $FieldListHeader.Text = "${CardName}: $($FieldLists -join ', ')"
+                $FieldListHeader.FontSize = 12
+                $FieldListHeader.Foreground = $syncHash.Window.FindResource("AccentBrush")
+                $FieldListHeader.Margin = "0,0,0,4"
+                [void]$policyInfoStack.Children.Add($FieldListHeader)
+            }
 
             # Add elements to header grid
             [void]$headerGrid.Children.Add($checkbox)
@@ -2094,18 +2096,59 @@ Function Invoke-SCuBAConfigAppUI {
             $detailsPanel.Margin = "24,12,0,0"
             [System.Windows.Controls.Grid]::SetRow($detailsPanel, 1)
 
-            # Exclusion type description
-            $exclusionDesc = New-Object System.Windows.Controls.TextBlock
-            $exclusionDesc.Text = $exclusionTypeDef.description
-            $exclusionDesc.FontStyle = "Italic"
-            $exclusionDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
-            $exclusionDesc.TextWrapping = "Wrap"
-            $exclusionDesc.Margin = "0,0,0,16"
-            [void]$detailsPanel.Children.Add($exclusionDesc)
+            # Create tab control for multiple inputFields if more than one
+            if ($validInputFields.Count -gt 1) {
+                $tabControl = New-Object System.Windows.Controls.TabControl
+                $tabControl.Margin = "0,0,0,16"
 
-            # Generate fields based on exclusion type
-            foreach ($field in $exclusionTypeDef.fields) {
-                New-ExclusionFieldControl -PolicyId $PolicyId -ExclusionTypeName $ExclusionType -Field $field -Container $detailsPanel
+                foreach ($inputData in $validInputFields) {
+                    $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                    if ($FieldListDef) {
+                        # Create tab item
+                        $tabItem = New-Object System.Windows.Controls.TabItem
+                        $tabItem.Header = $FieldListDef.name
+
+                        # Create tab content
+                        $tabContent = New-Object System.Windows.Controls.StackPanel
+                        $tabContent.Margin = "8"
+
+                        # Add description
+                        $fieldDesc = New-Object System.Windows.Controls.TextBlock
+                        $fieldDesc.Text = $FieldListDef.description
+                        $fieldDesc.FontStyle = "Italic"
+                        $fieldDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
+                        $fieldDesc.TextWrapping = "Wrap"
+                        $fieldDesc.Margin = "0,0,0,16"
+                        [void]$tabContent.Children.Add($fieldDesc)
+
+                        # Generate fields for this field
+                        foreach ($field in $FieldListDef.fields) {
+                            New-FieldListControl -ControlName $CardName -PolicyId $PolicyId -Field $field -Container $tabContent
+                        }
+
+                        $tabItem.Content = $tabContent
+                        [void]$tabControl.Items.Add($tabItem)
+                    }
+                }
+                [void]$detailsPanel.Children.Add($tabControl)
+            } else {
+                # Single Field - no tabs needed
+                $FieldListDef = $syncHash.UIConfigs.inputTypes.$validInputFields[0]
+
+                If($ShowDescription){
+                    # Card description
+                    $fieldDesc = New-Object System.Windows.Controls.TextBlock
+                    $fieldDesc.Text = $FieldListDef.description
+                    $fieldDesc.FontStyle = "Italic"
+                    $fieldDesc.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
+                    $fieldDesc.TextWrapping = "Wrap"
+                    $fieldDesc.Margin = "0,0,0,16"
+                    [void]$detailsPanel.Children.Add($fieldDesc)
+                }
+                # Generate fields based on Field
+                foreach ($field in $FieldListDef.fields) {
+                    New-FieldListControl -ControlName $CardName -PolicyId $PolicyId -Field $field -Container $detailsPanel
+                }
             }
 
             # Button panel
@@ -2115,20 +2158,20 @@ Function Invoke-SCuBAConfigAppUI {
 
             # Save button
             $saveButton = New-Object System.Windows.Controls.Button
-            $saveButton.Content = "Save Exclusion"
-            $saveButton.Name = ($PolicyId.replace('.', '_') + "_SaveExclusion")
+            $saveButton.Content = "Save $CardName"
+            $saveButton.Name = ($PolicyId.replace('.', '_') + "_" + $CardName + "_SaveButton")
             $saveButton.Style = $syncHash.Window.FindResource("PrimaryButton")
             $saveButton.Width = 120
-            $saveButton.Height = 26
+            $saveButton.Height = 28
             $saveButton.Margin = "0,0,10,0"
 
             # Remove button (initially hidden)
             $removeButton = New-Object System.Windows.Controls.Button
-            $removeButton.Content = "Remove Exclusion"
-            $removeButton.Name = ($PolicyId.replace('.', '_') + "_RemoveExclusion")
+            $removeButton.Content = "Remove $CardName"
+            $removeButton.Name = ($PolicyId.replace('.', '_') + "_" + $CardName + "_RemoveButton")
             $removeButton.Style = $syncHash.Window.FindResource("PrimaryButton")
             $removeButton.Width = 120
-            $removeButton.Height = 26
+            $removeButton.Height = 28
             $removeButton.Background = [System.Windows.Media.Brushes]::Red
             $removeButton.Foreground = [System.Windows.Media.Brushes]::White
             $removeButton.BorderThickness = "0"
@@ -2156,140 +2199,460 @@ Function Invoke-SCuBAConfigAppUI {
                 $detailsPanel.Visibility = "Collapsed"
             }.GetNewClosure())
 
-            # Add save button click handler
+            Add-ControlEventHandler -Control $saveButton
+            Add-ControlEventHandler -Control $removeButton
+
+            # Create click event for save button
             $saveButton.Add_Click({
-                $policyIdWithUnderscores = $this.Name.Replace("_SaveExclusion", "")
+                $policyIdWithUnderscores = $this.Name.Replace( ("_" + $CardName + "_SaveButton"), "")
                 $policyId = $policyIdWithUnderscores.Replace("_", ".")
 
-                Write-DebugOutput -Message "Saving exclusion for policy: $policyId" -Source $this.Name -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleInfoMessages.PolicySaving -f $CardName.ToLower(), $policyId) -Source $this.Name -Level "Info"
 
-                # Get the exclusion type configuration to get the actual YAML key name
-                $exclusionTypeConfig = $syncHash.UIConfigs.exclusionTypes.$ExclusionType
-                $yamlKeyName = if ($exclusionTypeConfig) { $exclusionTypeConfig.name } else { $ExclusionType }
-
-                # INITIALIZE exclusionData hashtable
-                $exclusionData = @{}
-
-                # Collect field values by traversing the UI tree
+                # Get the details panel (parent of button panel)
                 $detailsPanel = $this.Parent.Parent
 
-                foreach ($field in $exclusionTypeDef.fields) {
-                    $fieldName = ($policyId.replace('.', '_') + "_" + $ExclusionType + "_" + $field.name)
+                # Validate required fields BEFORE processing data
+                $missingRequiredFields = Test-RequiredField -detailsPanel $detailsPanel -validInputFields $validInputFields -policyId $policyId -CardName $CardName
 
-                    if ($field.type -eq "array") {
-                        # For arrays, look for the list container
-                        $listContainerName = ($fieldName + "_List")
-                        $listContainer = $detailsPanel.Children | ForEach-Object {
-                            if ($_ -is [System.Windows.Controls.StackPanel]) {
-                                $arrayContainer = $_.Children | Where-Object { $_.Name -eq ($fieldName + "_Container") }
-                                if ($arrayContainer) {
-                                    Write-DebugOutput -Message "Found array container for field [$field.name]: $($arrayContainer.Name)" -Source $this.Name -Level "Info"
-                                    return $arrayContainer.Children | Where-Object { $_.Name -eq $listContainerName }
+                if ($missingRequiredFields.Count -gt 0) {
+                    $errorMessage = if ($missingRequiredFields.Count -eq 1) {
+                        $syncHash.UIConfigs.localeErrorMessages.RequiredFieldValidation -f $missingRequiredFields[0]
+                    } else {
+                        $syncHash.UIConfigs.localeErrorMessages.RequiredFieldsValidation -f ($missingRequiredFields -join ", ")
+                    }
 
+                    [System.Windows.MessageBox]::Show($errorMessage, "Required Fields Missing", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
+                    return # Exit save operation if validation fails
+                }
+
+                # Initialize policy level if not exists
+                if (-not $OutputData[$ProductName]) {
+                    $OutputData[$ProductName] = @{}
+                }
+                if (-not $OutputData[$ProductName][$policyId]) {
+                    $OutputData[$ProductName][$policyId] = @{}
+                }
+
+                $hasOutputData = $false
+                $savedinputTypes = @()
+
+                # Get the details panel (parent of button panel)
+                $detailsPanel = $this.Parent.Parent
+
+                # Function to search recursively for the list container
+                function Find-ListContainer {
+                    <#
+                    .SYNOPSIS
+                    Recursively searches for a list container control by name.
+                    .DESCRIPTION
+                    This nested function traverses the WPF control hierarchy to locate a list container used for array field values.
+                    #>
+
+                    param($parent, $targetName)
+
+                    if ($parent.Name -eq $targetName) {
+                        return $parent
+                    }
+
+                    if ($parent.Children) {
+                        foreach ($child in $parent.Children) {
+                            $result = Find-ListContainer -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Content -and $parent.Content.Children) {
+                        foreach ($child in $parent.Content.Children) {
+                            $result = Find-ListContainer -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Items) {
+                        foreach ($item in $parent.Items) {
+                            if ($item.Content -and $item.Content.Children) {
+                                foreach ($child in $item.Content.Children) {
+                                    $result = Find-ListContainer -parent $child -targetName $targetName
+                                    if ($result) { return $result }
                                 }
                             }
-                        } | Select-Object -First 1
+                        }
+                    }
 
-                        if ($listContainer -and $listContainer.Children.Count -gt 0) {
-                            $items = @()
-                            foreach ($childPanel in $listContainer.Children) {
-                                # Each child is a StackPanel containing TextBlock and Button
-                                if ($childPanel -is [System.Windows.Controls.StackPanel] -and $childPanel.Children.Count -gt 0) {
-                                    $textBlock = $childPanel.Children[0]
-                                    if ($textBlock -is [System.Windows.Controls.TextBlock] -and ![string]::IsNullOrWhiteSpace($textBlock.Text)) {
-                                        $items += $textBlock.Text.Trim()
+                    return $null
+                }
+
+                # Function to search recursively for the checkbox
+                function Find-CheckBox {
+                    <#
+                    .SYNOPSIS
+                    Recursively searches for a CheckBox control by name.
+                    .DESCRIPTION
+                    This nested function traverses the WPF control hierarchy to locate a specific CheckBox control used for boolean field values.
+                    #>
+                    param($parent, $targetName)
+
+                    if ($parent.Name -eq $targetName -and $parent -is [System.Windows.Controls.CheckBox]) {
+                        return $parent
+                    }
+
+                    if ($parent.Children) {
+                        foreach ($child in $parent.Children) {
+                            $result = Find-CheckBox -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Content -and $parent.Content.Children) {
+                        foreach ($child in $parent.Content.Children) {
+                            $result = Find-CheckBox -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Items) {
+                        foreach ($item in $parent.Items) {
+                            if ($item.Content -and $item.Content.Children) {
+                                foreach ($child in $item.Content.Children) {
+                                    $result = Find-CheckBox -parent $child -targetName $targetName
+                                    if ($result) { return $result }
+                                }
+                            }
+                        }
+                    }
+
+                    return $null
+                }
+
+                # Function to search recursively for the textbox
+                function Find-TextBox {
+                    <#
+                    .SYNOPSIS
+                    Recursively searches for a TextBox control by name.
+                    .DESCRIPTION
+                    This nested function traverses the WPF control hierarchy to locate a specific TextBox control used for string field values.
+                    #>
+                    param($parent, $targetName)
+
+                    if ($parent.Name -eq $targetName -and $parent -is [System.Windows.Controls.TextBox]) {
+                        return $parent
+                    }
+
+                    if ($parent.Children) {
+                        foreach ($child in $parent.Children) {
+                            $result = Find-TextBox -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Content -and $parent.Content.Children) {
+                        foreach ($child in $parent.Content.Children) {
+                            $result = Find-TextBox -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Items) {
+                        foreach ($item in $parent.Items) {
+                            if ($item.Content -and $item.Content.Children) {
+                                foreach ($child in $item.Content.Children) {
+                                    $result = Find-TextBox -parent $child -targetName $targetName
+                                    if ($result) { return $result }
+                                }
+                            }
+                        }
+                    }
+
+                    return $null
+                }
+
+                function Find-DatePicker {
+                    <#
+                    .SYNOPSIS
+                    Recursively searches for a DatePicker control by name.
+                    .DESCRIPTION
+                    This nested function traverses the WPF control hierarchy to locate a specific DatePicker control used for date field values.
+                    #>
+                    param($parent, $targetName)
+
+                    if ($parent.Name -eq $targetName -and $parent -is [System.Windows.Controls.DatePicker]) {
+                        return $parent
+                    }
+
+                    if ($parent.Children) {
+                        foreach ($child in $parent.Children) {
+                            $result = Find-DatePicker -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Content -and $parent.Content.Children) {
+                        foreach ($child in $parent.Content.Children) {
+                            $result = Find-DatePicker -parent $child -targetName $targetName
+                            if ($result) { return $result }
+                        }
+                    }
+
+                    if ($parent.Items) {
+                        foreach ($item in $parent.Items) {
+                            if ($item.Content -and $item.Content.Children) {
+                                foreach ($child in $item.Content.Children) {
+                                    $result = Find-DatePicker -parent $child -targetName $targetName
+                                    if ($result) { return $result }
+                                }
+                            }
+                        }
+                    }
+
+                    return $null
+                }
+
+                # Process each Field and MERGE them into a single policy entry
+                foreach ($inputData in $validInputFields) {
+                    $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                    if (-not $FieldListDef) { continue }
+
+                    # Get the YAML key name
+                    $yamlKeyName = $FieldListDef.name
+
+                    Write-DebugOutput -Message (($syncHash.UIConfigs.LocaleVerboseMessages.ControlFieldProcessing -f $CardName, $inputData)) -Source $this.Name -Level "Verbose"
+
+                    # Collect field values for this Field
+                    $fieldCardData = @{}
+                    foreach ($field in $FieldListDef.fields) {
+                        # Use $field.value for control names (matching creation)
+                        $controlFieldName = ($policyId.replace('.', '_') + "_" + $CardName + "_" + $field.value)
+
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleVerboseMessages.ControlFieldCardSearch -f $controlFieldName, $field.type) -Source $this.Name -Level "Verbose"
+
+                        if ($field.type -eq "array") {
+                            # For arrays, look for the list container
+                            $listContainerName = ($controlFieldName + "_List")
+                            $listContainer = Find-ListContainer -parent $detailsPanel -targetName $listContainerName
+
+                            if ($listContainer -and $listContainer.Children.Count -gt 0) {
+                                $items = @()
+                                foreach ($childPanel in $listContainer.Children) {
+                                    if ($childPanel -is [System.Windows.Controls.StackPanel]) {
+                                        foreach ($element in $childPanel.Children) {
+                                            if ($element -is [System.Windows.Controls.TextBlock]) {
+                                                $text = $element.Text.Trim()
+                                                if (-not [string]::IsNullOrWhiteSpace($text)) {
+                                                    $items += $text
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                            if ($items.Count -gt 0) {
-                                $exclusionData[$field.name] = $items
-                                Write-DebugOutput -Message "Collected array field [$field.name]: $($items -join ', ')" -Source $this.Name -Level "Info"
-                            }
-                        }
-                    } elseif ($field.type -eq "string") {
-                        # For strings, look for the TextBox
-                        $stringFieldName = ($fieldName + "_TextBox")
-                        $stringTextBox = $detailsPanel.Children | ForEach-Object {
-                            if ($_ -is [System.Windows.Controls.StackPanel]) {
-                                return $_.Children | Where-Object { $_.Name -eq $stringFieldName -and $_ -is [System.Windows.Controls.TextBox] }
-                            }
-                        } | Select-Object -First 1
 
-                        if ($stringTextBox -and ![string]::IsNullOrWhiteSpace($stringTextBox.Text)) {
-                            $value = $stringTextBox.Text.Trim()
-                            $exclusionData[$field.name] = $value
-                            Write-DebugOutput -Message "Collected string field [$field.name]: $value" -Source $this.Name -Level "Info"
+                                if ($items.Count -gt 0) {
+                                    # Use $field.value for data storage key (YAML output)
+                                    $fieldCardData[$field.value] = $items
+                                    Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleInfoMessages.CollectedArrayField -f $inputData, $field.value, ($items -join ', ')) -Source $this.Name -Level "Info"
+                                }
+                            } else {
+                                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleErrorMessages.ListContainerNotFound -f $listContainerName) -Source $this.Name -Level "Warning"
+                            }
+
+                        } elseif ($field.type -eq "boolean") {
+                            # For boolean, look for the CheckBox
+                            $booleanFieldName = ($controlFieldName + "_CheckBox")
+                            $booleanCheckBox = Find-CheckBox -parent $detailsPanel -targetName $booleanFieldName
+
+                            if ($booleanCheckBox) {
+                                $value = [bool]$booleanCheckBox.IsChecked
+                                # Use $field.value for data storage key (YAML output)
+                                $fieldCardData[$field.value] = $value
+                                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleInfoMessages.CollectedBooleanField -f $inputData, $field.value, $value) -Source $this.Name -Level "Info"
+                            } else {
+                                Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleErrorMessages.ListContainerNotFound -f $booleanFieldName) -Source $this.Name -Level "Warning"
+                            }
+
+                        } elseif ($field.type -match "string") {
+                            # Check if this is a dateString with yearmonthday - look for DatePicker
+                            if ($field.type -eq "dateString") {
+                                $datePickerName = ($controlFieldName + "_DatePicker")
+                                $datePicker = Find-DatePicker -parent $detailsPanel -targetName $datePickerName
+
+                                if ($datePicker -and $datePicker.SelectedDate) {
+                                    $value = $datePicker.SelectedDate.ToString($syncHash.UIConfigs.valueValidations.($Field.valueType).format)
+                                    $fieldCardData[$field.value] = $value
+                                    Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleInfoMessages.CollectedStringField -f $inputData, $field.value, $value) -Source $this.Name -Level "Info"
+                                }
+                            } else {
+                                $stringFieldName = ($controlFieldName + "_TextBox")
+                                $stringTextBox = Find-TextBox -parent $detailsPanel -targetName $stringFieldName
+
+                                if ($stringTextBox -and ![string]::IsNullOrWhiteSpace($stringTextBox.Text)) {
+                                    # Check if it's not just the placeholder text using config-driven approach
+                                    $placeholderText = if ($syncHash.UIConfigs.valueValidations.($field.valueType)) {
+                                        $syncHash.UIConfigs.valueValidations.($field.valueType).sample
+                                    } else {
+                                        "Enter value"  # fallback
+                                    }
+
+                                    if ($stringTextBox.Text.Trim() -ne $placeholderText) {
+                                        $value = $stringTextBox.Text.Trim()
+                                        # Use $field.value for data storage key (YAML output)
+                                        $fieldCardData[$field.value] = $value
+                                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleVerboseMessages.CollectedStringField -f $inputData, $field.value, $value) -Source $this.Name -Level "Info"
+                                    }
+                                } else {
+                                    Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleErrorMessages.StringFieldNotFound -f $stringFieldName) -Source $this.Name -Level "Warning"
+                                }
+                            }
                         }
+                    }
+
+                    # Store the data with proper nesting for YAML output
+                    if ($fieldCardData.Count -gt 0) {
+                        # Get the YAML section name (exclusion type value like "CapExclusions", "RoleExclusions")
+                        $FieldListValue = $FieldListDef.value
+
+                        # Handle empty values - store fields directly under policy if no group value
+                        if ([string]::IsNullOrWhiteSpace($FieldListValue)) {
+                            # If the inputType has no value, store fields directly under the policy
+                            foreach ($fieldKey in $fieldCardData.Keys) {
+                                $OutputData[$ProductName][$policyId][$fieldKey] = $fieldCardData[$fieldKey]
+                            }
+                            Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleInfoMessages.MergedCardField -f $CardName, $ProductName, $policyId, "Direct", ($fieldCardData | ConvertTo-Json -Compress)) -Source $this.Name -Level "Info"
+                        } else {
+                            # If the inputType has a value, create nested structure
+                            # Initialize the exclusion type container if it doesn't exist
+                            if (-not $OutputData[$ProductName][$policyId][$FieldListValue]) {
+                                $OutputData[$ProductName][$policyId][$FieldListValue] = @{}
+                            }
+
+                            # Store field data under the exclusion type
+                            foreach ($fieldKey in $fieldCardData.Keys) {
+                                $OutputData[$ProductName][$policyId][$FieldListValue][$fieldKey] = $fieldCardData[$fieldKey]
+                            }
+                            Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleInfoMessages.MergedCardField -f $CardName, $ProductName, $policyId, $FieldListValue, ($fieldCardData | ConvertTo-Json -Compress)) -Source $this.Name -Level "Info"
+                        }
+
+                        $hasOutputData = $true
+                        $savedinputTypes += $yamlKeyName
+                    } else {
+                        Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleErrorMessages.NoEntriesCollected -f $CardName.ToLower(), $inputData) -Source $this.Name -Level "Warning"
                     }
                 }
 
-                # Only create exclusion if we have data
-                if ($exclusionData.Count -gt 0) {
-                    # Initialize product level if not exists
-                    if (-not $syncHash.Exclusions[$ProductName]) {
-                        $syncHash.Exclusions[$ProductName] = @{}
-                    }
-
-                    # Initialize policy level if not exists
-                    if (-not $syncHash.Exclusions[$ProductName][$policyId]) {
-                        $syncHash.Exclusions[$ProductName][$policyId] = @{}
-                    }
-
-                    # Set the exclusion data using the YAML key name
-                    $syncHash.Exclusions[$ProductName][$policyId][$yamlKeyName] = $exclusionData
-
-                    Write-DebugOutput -Message "Exclusion saved for [$ProductName][$policyId][$yamlKeyName]: $($exclusionData | ConvertTo-Json -Compress)" -Source $this.Name -Level "Info"
-
-                    [System.Windows.MessageBox]::Show("[$policyId] exclusion saved successfully.", "Success", "OK", "Information")
+                if ($hasOutputData) {
+                    # Log the final merged structure
+                    [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.LocalePopupMessages.CardSavedSuccess -f $CardName, $ProductName, $policyId, ($savedinputTypes -join ', ')), "Success", "OK", "Information")
 
                     # Make remove button visible and header bold
                     $removeButton.Visibility = "Visible"
                     $policyHeader.FontWeight = "Bold"
+
+                    # Collapse details panel and uncheck checkbox
+                    $detailsPanel.Visibility = "Collapsed"
+                    $checkbox.IsChecked = $false
                 } else {
-                    [System.Windows.MessageBox]::Show("No exclusion data entered. Please fill in at least one field.", "Validation Error", "OK", "Warning")
-                    return
+                    Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleErrorMessages.NoEntriesFound -f $CardName.ToLower(), $inputData) -Source $this.Name -Level "Error"
+                    [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.LocalePopupMessages.NoEntriesFound -f $CardName.ToLower()), "Validation Error", "OK", "Warning")
                 }
-
-                # collapse details panel
-                $detailsPanel.Visibility = "Collapsed"
-
-                #uncheck checkbox
-                $checkbox.IsChecked = $false
             }.GetNewClosure())
 
-            # Add remove button click handler
+
+            # Enhanced remove button click handler for multiple exclusionFields
             $removeButton.Add_Click({
-                $policyIdWithUnderscores = $this.Name.Replace("_RemoveExclusion", "")
+                $policyIdWithUnderscores = $this.Name.Replace(("_" + $CardName + "_RemoveButton"), "")
                 $policyId = $policyIdWithUnderscores.Replace("_", ".")
 
-                $result = [System.Windows.MessageBox]::Show("Are you sure you want to remove exclusions for [$policyId]?", "Confirm Remove", "YesNo", "Question")
+                $result = [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.LocalePopupMessages.RemoveCardPolicyConfirmation -f $CardName.ToLower(), $policyId), "Confirm Remove", "YesNo", "Question")
                 if ($result -eq [System.Windows.MessageBoxResult]::Yes) {
 
                     # Remove the policy from the nested structure
-                    if ($syncHash.Exclusions[$ProductName] -and $syncHash.Exclusions[$ProductName][$policyId]) {
-                        $syncHash.Exclusions[$ProductName].Remove($policyId)
+                    if ($OutputData[$ProductName] -and $OutputData[$ProductName][$policyId]) {
+                        $OutputData[$ProductName].Remove($policyId)
 
                         # If no more policies for this product, remove the product
-                        if ($syncHash.Exclusions[$ProductName].Count -eq 0) {
-                            $syncHash.Exclusions.Remove($ProductName)
+                        if ($OutputData[$ProductName].Count -eq 0) {
+                            $OutputData.Remove($ProductName)
                         }
                     }
 
-                    # Clear all field values
-                    foreach ($field in $exclusionTypeDef.fields) {
-                        $fieldName = ($policyId.replace('.', '_') + "_" + $ExclusionType + "_" + $field.name)
-                        $fieldControl = $syncHash.$fieldName
+                    # Clear all field values for all exclusionFields
+                    foreach ($inputData in $validInputFields) {
+                        $FieldListDef = $syncHash.UIConfigs.inputTypes.$inputData
+                        if ($FieldListDef) {
+                            foreach ($field in $FieldListDef.fields) {
+                                $fieldName = ($policyId.replace('.', '_') + "_" + $inputData + "_" + $field.name)
 
-                        if ($fieldControl) {
-                            if ($field.type -eq "array") {
-                                $fieldControl.Items.Clear()
-                            } elseif ($field.type -eq "string") {
-                                $fieldControl.Text = ""
+                                if ($field.type -eq "array") {
+                                    # Clear list containers
+                                    $listContainerName = ($fieldName + "_List")
+                                    $listContainer = $detailsPanel.Children | ForEach-Object {
+                                        if ($_ -is [System.Windows.Controls.StackPanel]) {
+                                            $arrayContainer = $_.Children | Where-Object { $_.Name -eq ($fieldName + "_" + $CardName + "_Container") }
+                                            if ($arrayContainer) {
+                                                return $arrayContainer.Children | Where-Object { $_.Name -eq $listContainerName }
+                                            }
+                                        } elseif ($_ -is [System.Windows.Controls.TabControl]) {
+                                            # Search within tab control
+                                            foreach ($tabItem in $_.Items) {
+                                                if ($tabItem.Header -eq $FieldListDef.name) {
+                                                    $tabContent = $tabItem.Content
+                                                    $arrayContainer = $tabContent.Children | Where-Object { $_.Name -eq ($fieldName + "_" + $CardName + "_Container") }
+                                                    if ($arrayContainer) {
+                                                        return $arrayContainer.Children | Where-Object { $_.Name -eq $listContainerName }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } | Select-Object -First 1
+
+                                    if ($listContainer) {
+                                        $listContainer.Children.Clear()
+                                    }
+                                } elseif ($field.type -eq "boolean") {
+                                    # Reset checkbox
+                                    $booleanFieldName = ($fieldName + "_" + $CardName + "_CheckBox")
+                                    $booleanCheckBox = $detailsPanel.Children | ForEach-Object {
+                                        if ($_ -is [System.Windows.Controls.StackPanel]) {
+                                            return $_.Children | Where-Object { $_.Name -eq $booleanFieldName -and $_ -is [System.Windows.Controls.CheckBox] }
+                                        } elseif ($_ -is [System.Windows.Controls.TabControl]) {
+                                            # Search within tab control
+                                            foreach ($tabItem in $_.Items) {
+                                                if ($tabItem.Header -eq $FieldListDef.name) {
+                                                    $tabContent = $tabItem.Content
+                                                    return $tabContent.Children | Where-Object { $_.Name -eq $booleanFieldName -and $_ -is [System.Windows.Controls.CheckBox] }
+                                                }
+                                            }
+                                        }
+                                    } | Select-Object -First 1
+
+                                    if ($booleanCheckBox) {
+                                        $booleanCheckBox.IsChecked = $false
+                                    }
+                                } elseif ($field.type -eq "string") {
+                                    # Clear text boxes
+                                    $stringFieldName = ($fieldName + "_" + $CardName + "_TextBox")
+                                    $stringTextBox = $detailsPanel.Children | ForEach-Object {
+                                        if ($_ -is [System.Windows.Controls.StackPanel]) {
+                                            return $_.Children | Where-Object { $_.Name -eq $stringFieldName -and $_ -is [System.Windows.Controls.TextBox] }
+                                        } elseif ($_ -is [System.Windows.Controls.TabControl]) {
+                                            # Search within tab control
+                                            foreach ($tabItem in $_.Items) {
+                                                if ($tabItem.Header -eq $FieldListDef.name) {
+                                                    $tabContent = $tabItem.Content
+                                                    return $tabContent.Children | Where-Object { $_.Name -eq $stringFieldName -and $_ -is [System.Windows.Controls.TextBox] }
+                                                }
+                                            }
+                                        }
+                                    } | Select-Object -First 1
+
+                                    if ($stringTextBox) {
+                                        $stringTextBox.Text = ""
+                                    }
+                                }
                             }
                         }
                     }
 
-                    [System.Windows.MessageBox]::Show("[$policyId] exclusions removed successfully.", "Success", "OK", "Information")
+                    [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.LocalePopupMessages.RemoveCardEntrySuccess -f $CardName, $policyId), "Success", "OK", "Information")
 
                     # Hide remove button and unbold header
                     $this.Visibility = "Collapsed"
@@ -2301,37 +2664,6 @@ Function Invoke-SCuBAConfigAppUI {
             return $card
         }
 
-        # Function to populate exclusions for a product
-        Function New-ProductExclusions {
-            param(
-                [string]$ProductName,
-                [System.Windows.Controls.StackPanel]$Container
-            )
-
-            $Container.Children.Clear()
-
-            # Get baselines for this product that support exclusions
-            $baselines = $syncHash.UIConfigs.baselines.$ProductName | Where-Object { $_.exclusionType -ne 'none' } | Select-Object id, name, rationale, exclusionType
-
-            if ($baselines -and $baselines.Count -gt 0) {
-                foreach ($baseline in $baselines) {
-                    $card = New-ExclusionCard -PolicyId $baseline.id -ProductName $ProductName -PolicyName $baseline.name -PolicyDescription $baseline.rationale -ExclusionType $baseline.exclusionType
-                    if ($card) {
-                        $Container.Children.Add($card)
-                    }
-                }
-            } else {
-                # No baselines available for exclusions
-                $noDataText = New-Object System.Windows.Controls.TextBlock
-                $noDataText.Text = "No policies support exclusions in this product."
-                $noDataText.Foreground = $syncHash.Window.FindResource("MutedTextBrush")
-                $noDataText.FontStyle = "Italic"
-                $noDataText.HorizontalAlignment = "Center"
-                $noDataText.Margin = "0,50,0,0"
-                $Container.Children.Add($noDataText)
-            }
-        }
-
         #===========================================================================
         #
         # GRAPH HELPER
@@ -2340,6 +2672,12 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Enhanced Graph Query Function with Filter Support
         function Invoke-GraphQueryWithFilter {
+            <#
+            .SYNOPSIS
+            Executes Microsoft Graph API queries with filtering support in a background thread.
+            .DESCRIPTION
+            This function performs asynchronous Microsoft Graph API queries with optional filtering, returning data for users, groups, or other Graph entities.
+            #>
             param(
                 [string]$QueryType,
                 $GraphConfig,
@@ -2437,11 +2775,14 @@ Function Invoke-SCuBAConfigAppUI {
         # Graph Selection Function
         #===========================================================================
         function Show-GraphProgressWindow {
+            <#
+            .SYNOPSIS
+            Displays a progress window while executing Graph queries and shows results in a selection interface.
+            .DESCRIPTION
+            This function shows a progress dialog during Graph API operations and presents the results in a searchable, selectable data grid for users and groups.
+            #>
             param(
-                [Parameter(Mandatory)]
-                [ValidateSet("users", "groups")]
                 [string]$GraphEntityType,
-
                 [string]$SearchTerm = "",
                 [int]$Top = 100
             )
@@ -2616,34 +2957,34 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
-        function Show-UserSelector {
+        function Show-GraphSelector {
+            <#
+            .SYNOPSIS
+            Shows a Graph entity selector with optional search functionality.
+            .DESCRIPTION
+            This function displays a selector interface for Microsoft Graph entities (users, groups) with optional search term filtering and result limiting.
+            #>
             param(
+                [string]$GraphEntityType,
                 [string]$SearchTerm = "",
                 [int]$Top = 100
             )
             If([string]::IsNullOrWhiteSpace($SearchTerm)) {
-                Write-DebugOutput -Message "Showing user selector with top: $Top" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message "Showing $($GraphEntityType.ToLower()) selector with top: $Top" -Source $MyInvocation.MyCommand.Name -Level "Info"
             }Else {
-                Write-DebugOutput -Message "Showing user selector with search term: $SearchTerm, top: $Top" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message "Showing $($GraphEntityType.ToLower()) selector with search term: $SearchTerm, top: $Top" -Source $MyInvocation.MyCommand.Name -Level "Info"
             }
-            return Show-GraphProgressWindow -GraphEntityType "users" -SearchTerm $SearchTerm -Top $Top
-        }
-
-        function Show-GroupSelector {
-            param(
-                [string]$SearchTerm = "",
-                [int]$Top = 100
-            )
-            If([string]::IsNullOrWhiteSpace($SearchTerm)) {
-                Write-DebugOutput -Message "Showing group selector with top: $Top" -Source $MyInvocation.MyCommand.Name -Level "Info"
-            }Else {
-                Write-DebugOutput -Message "Showing group selector with search term: $SearchTerm, top: $Top" -Source $MyInvocation.MyCommand.Name -Level "Info"
-            }
-            return Show-GraphProgressWindow -GraphEntityType "groups" -SearchTerm $SearchTerm -Top $Top
+            return Show-GraphProgressWindow -GraphEntityType $GraphEntityType -SearchTerm $SearchTerm -Top $Top
         }
 
         #build UI selection window
         function Show-UISelectionWindow {
+            <#
+            .SYNOPSIS
+            Creates a universal selection window with search and filtering capabilities.
+            .DESCRIPTION
+            This function generates a reusable selection dialog with a searchable data grid, supporting single or multiple selection modes for various data types.
+            #>
             param(
                 [Parameter(Mandatory)]
                 [string]$Title,
@@ -2780,9 +3121,9 @@ Function Invoke-SCuBAConfigAppUI {
                     if ([string]::IsNullOrWhiteSpace($searchText) -or $searchText -eq $SearchPlaceholder.ToLower()) {
                         $dataGrid.ItemsSource = $originalItems
                     } else {
-                        $filteredItems = $originalItems | Where-Object {
+                        $filteredItems = @($originalItems | Where-Object {
                             $_.$SearchProperty.ToLower().Contains($searchText)
-                        }
+                        })
                         $dataGrid.ItemsSource = $filteredItems
                     }
                 }
@@ -2890,6 +3231,12 @@ Function Invoke-SCuBAConfigAppUI {
         # Function to import YAML data into core data structures (without UI updates)
         # Updated Import-YamlToDataStructures Function
         Function Import-YamlToDataStructures {
+            <#
+            .SYNOPSIS
+            Imports YAML configuration data into internal data structures.
+            .DESCRIPTION
+            This function parses YAML configuration data and populates the application's internal data structures without updating the UI.
+            #>
             param($Config)
 
             try {
@@ -2924,14 +3271,14 @@ Function Invoke-SCuBAConfigAppUI {
                             foreach ($policyId in $productKeys) {
                                 $policyData = $productData[$policyId]
 
-                                # Find the exclusion type from baseline config
+                                # Find the exclusionField from baseline config
                                 $baseline = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
-                                if ($baseline -and $baseline.exclusionType -ne "none") {
-                                    # Get the exclusion type configuration to get the actual YAML key name
-                                    $exclusionTypeConfig = $syncHash.UIConfigs.exclusionTypes.($baseline.exclusionType)
-                                    $yamlKeyName = if ($exclusionTypeConfig) { $exclusionTypeConfig.name } else { $baseline.exclusionType }
+                                if ($baseline -and $baseline.exclusionField -ne "none") {
+                                    # Get the exclusionField configuration to get the actual YAML key name
+                                    $FieldListConfig = $syncHash.UIConfigs.inputTypes.($baseline.exclusionField)
+                                    $yamlKeyName = if ($FieldListConfig) { $FieldListConfig.name } else { $baseline.exclusionField }
 
-                                    # Check if the policy data contains the expected exclusion type key
+                                    # Check if the policy data contains the expected exclusionField key
                                     if ($policyData.ContainsKey($yamlKeyName)) {
                                         # Initialize product level if not exists
                                         if (-not $syncHash.Exclusions[$productName]) {
@@ -2943,13 +3290,13 @@ Function Invoke-SCuBAConfigAppUI {
                                             $syncHash.Exclusions[$productName][$policyId] = @{}
                                         }
 
-                                        # CORRECTED: Extract the field data from inside the exclusion type
+                                        # CORRECTED: Extract the field data from inside the exclusionField
                                         # Instead of: $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $policyData
                                         # We want: $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $policyData[$yamlKeyName]
-                                        $exclusionFieldData = $policyData[$yamlKeyName]
-                                        $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $exclusionFieldData
+                                        $FieldListData = $policyData[$yamlKeyName]
+                                        $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $FieldListData
 
-                                        Write-DebugOutput -Message "Imported exclusion for [$productName][$policyId][$yamlKeyName]: $($exclusionFieldData | ConvertTo-Json -Compress)" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                                        Write-DebugOutput -Message "Imported exclusion for [$productName][$policyId][$yamlKeyName]: $($FieldListData | ConvertTo-Json -Compress)" -Source $MyInvocation.MyCommand.Name -Level "Info"
                                     }
                                 }
                             }
@@ -3028,9 +3375,13 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
-
         Function New-YamlPreview {
-            # Generate YAML preview
+            <#
+            .SYNOPSIS
+            Generates YAML configuration preview from current UI settings.
+            .DESCRIPTION
+            This function creates a YAML preview string by collecting values from all UI controls and formatting them according to ScubaGear configuration standards.
+            #>
             $yamlPreview = @()
             $yamlPreview += '# ScubaGear Configuration File'
             $yamlPreview += "`n# Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
@@ -3065,26 +3416,12 @@ Function Invoke-SCuBAConfigAppUI {
             $yamlPreview += "`n`n# Configuration Details"
 
             # Handle ProductNames using the enhanced function
-            #$productNamesForYaml = Update-ProductName -AsYamlOutput
             $yamlPreview += Get-ProductNamesForYaml
-
-            <#if ($productNamesForYaml.Count -gt 0) {
-                if ($productNamesForYaml -contains '*') {
-                    $yamlPreview += "`nProductNames: ['*']"
-                } else {
-                    $yamlPreview += "`nProductNames:"
-                    foreach ($product in $productNamesForYaml) {
-                        $yamlPreview += "`n  - $product"
-                    }
-                }
-            }
-            #>
 
             # Handle M365Environment
             $selectedEnv = $syncHash.UIConfigs.M365Environment | Where-Object { $_.id -eq $syncHash.M365Environment_ComboBox.SelectedItem.Tag } | Select-Object -ExpandProperty name
             $yamlPreview += "`n`nM365Environment: $selectedEnv"
             $yamlPreview += "`n"
-
 
             # Process advanced settings in order of defaultAdvancedSettings keys
             if ($syncHash.UIConfigs.defaultAdvancedSettings) {
@@ -3095,31 +3432,55 @@ Function Invoke-SCuBAConfigAppUI {
                     $control = $syncHash.$advancedKey
                     $defaultValue = $syncHash.UIConfigs.defaultAdvancedSettings.$advancedKey
 
-                    if ($control -is [System.Windows.Controls.TextBox]) {
+                    # Only include settings that are explicitly enabled by the user
+                    # Check if there's an associated checkbox to enable/disable this setting
+                    $enabledCheckBoxName = $advancedKey -replace '_TextBox$', '_EnabledCheckBox'
+                    $enabledCheckBox = $syncHash.$enabledCheckBoxName
+
+                    # If there's no enabled checkbox, check if setting has been modified from default
+                    $shouldInclude = $false
+
+                    if ($enabledCheckBox -is [System.Windows.Controls.CheckBox]) {
+                        # If there's an enabled checkbox, only include if checked
+                        $shouldInclude = $enabledCheckBox.IsChecked -eq $true
+                    } elseif ($control -is [System.Windows.Controls.TextBox]) {
+                        # If no enabled checkbox, only include if user has changed from default
                         $currentValue = $control.Text
+                        $shouldInclude = (![string]::IsNullOrWhiteSpace($currentValue) -and
+                                        ![string]::IsNullOrWhiteSpace($defaultValue))
+                    } elseif ($control -is [System.Windows.Controls.CheckBox]) {
+                        # For checkbox controls, only include if different from default
+                        $shouldInclude = $control.IsChecked -ne $defaultValue
+                    }
 
-                        # Include if it has a value (use current value or default if empty)
-                        $valueToUse = if (![string]::IsNullOrWhiteSpace($currentValue)) { $currentValue } else { $defaultValue }
+                    # Only process if the setting should be included
+                    if ($shouldInclude) {
+                        if ($control -is [System.Windows.Controls.TextBox]) {
+                            $currentValue = $control.Text
 
-                        if (![string]::IsNullOrWhiteSpace($valueToUse)) {
-                            # Convert control name to YAML field name (remove _TextBox suffix)
-                            $yamlFieldName = $advancedKey -replace '_TextBox$', ''
+                            # Use current value or default if empty
+                            $valueToUse = if (![string]::IsNullOrWhiteSpace($currentValue)) { $currentValue } else { $defaultValue }
 
-                            # Handle path escaping
-                            if ($valueToUse -match '\\') {
-                                $advancedSettingsContent += "`n$yamlFieldName`: `"$($valueToUse.Replace('\', '\\'))`""
-                            } else {
-                                $advancedSettingsContent += "`n$yamlFieldName`: `"$valueToUse`""
+                            if (![string]::IsNullOrWhiteSpace($valueToUse)) {
+                                # Convert control name to YAML field name (remove _TextBox suffix)
+                                $yamlFieldName = $advancedKey -replace '_TextBox$', ''
+
+                                # Handle path escaping
+                                if ($valueToUse -match '\\') {
+                                    $advancedSettingsContent += "`n$yamlFieldName`: `"$($valueToUse.Replace('\', '\\'))`""
+                                } else {
+                                    $advancedSettingsContent += "`n$yamlFieldName`: $valueToUse"
+                                }
+                                $hasAdvancedSettings = $true
                             }
+                        }
+                        elseif ($control -is [System.Windows.Controls.CheckBox]) {
+                            # Convert control name to YAML field name (remove _CheckBox suffix)
+                            $yamlFieldName = $advancedKey -replace '_CheckBox$', ''
+                            $boolValue = if ($control.IsChecked) { "true" } else { "false" }
+                            $advancedSettingsContent += "`n$yamlFieldName`: $boolValue"
                             $hasAdvancedSettings = $true
                         }
-                    }
-                    elseif ($control -is [System.Windows.Controls.CheckBox]) {
-                        # Convert control name to YAML field name (remove _CheckBox suffix)
-                        $yamlFieldName = $advancedKey -replace '_CheckBox$', ''
-                        $boolValue = if ($control.IsChecked) { "true" } else { "false" }
-                        $advancedSettingsContent += "`n$yamlFieldName`: $boolValue"
-                        $hasAdvancedSettings = $true
                     }
                 }
 
@@ -3131,76 +3492,115 @@ Function Invoke-SCuBAConfigAppUI {
                 }
             }
 
+            <#
+            Function New-DynamicYamlSections {
+                foreach ($baselineControl in $syncHash.UIConfigs.baselineControls) {
+                    $dataHashtable = $syncHash.($baselineControl.dataControlOutput)
+
+                    if ($dataHashtable -and $dataHashtable.Keys.Count -gt 0) {
+                        $yamlPreview += "`n`n$($baselineControl.yamlValue):"
+
+                        # Generate content based on the data structure
+                        foreach ($productName in $dataHashtable.Keys) {
+                            foreach ($policyId in $dataHashtable[$productName].Keys) {
+                                # Dynamic YAML generation logic here
+                            }
+                        }
+                    }
+                }
+            }
+            #>
+
+
             # Handle Exclusions (unchanged - already hashtable)
-            #TEST $productName = $syncHash.Exclusions.Keys[0]
             foreach ($productName in $syncHash.Exclusions.Keys) {
-                $productHasExclusions = $false
+                #$productHasExclusions = $false
                 $productExclusions = @()
 
-                #TEST $policyId = $syncHash.Exclusions[$productName].Keys[0]
                 foreach ($policyId in $syncHash.Exclusions[$productName].Keys) {
-                    #get baseline from config
                     $baseline = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
 
-                    #TEST $exclusionKey = $syncHash.Exclusions[$productName][$policyId].Keys[0]
-                    foreach ($exclusionKey in $syncHash.Exclusions[$productName][$policyId].Keys) {
-                        $exclusionData = $syncHash.Exclusions[$productName][$policyId][$exclusionKey]
+                    $policyBlock = @()
 
-                        if ($exclusionData.Count -gt 0) {
-                            if (-not $productHasExclusions) {
-                                $productExclusions += "`n$productName`:"
-                                $productHasExclusions = $true
+                    if ($baseline) {
+                        $policyBlock += "`n  # $($baseline.name)"
+                    }
+
+                    $policyBlock += "`n  $policyId`:"  # Only once per policy
+
+                    $exclusions = $syncHash.Exclusions[$productName][$policyId]
+
+                    foreach ($exclusionKey in $exclusions.Keys) {
+                        $exclusionData = $exclusions[$exclusionKey]
+
+                        if ($null -ne $exclusionData -and ($exclusionData -isnot [System.Collections.ICollection] -or $exclusionData.Count -gt 0)) {
+
+                            # Handle types: boolean / string
+                            if ($exclusionData -is [bool] -or $exclusionData -is [string] -or $exclusionData -is [int]) {
+                                $policyBlock += "`n    $exclusionKey`: $exclusionData"
                             }
 
-                            #add comment for the policy
-                            if ($baseline) {
-                                $productExclusions += "`n  # $($baseline.name)"
+                            # Array
+                            elseif ($exclusionData -is [array]) {
+                                $policyBlock += "`n    $exclusionKey`:"
+                                foreach ($item in $exclusionData) {
+                                    $policyBlock += "`n      - $item"
+                                }
                             }
-                            $productExclusions += "`n  $policyId`:"
-                            $productExclusions += "`n    $exclusionKey`:"
 
-                            # $exclusionData contains the field data directly (e.g., @{Groups = @("guid1", "guid2")})
-                            if ($exclusionData.Count -gt 0) {
+                            # Hashtable
+                            elseif ($exclusionData -is [hashtable]) {
+                                $policyBlock += "`n    $exclusionKey`:"
                                 foreach ($fieldName in $exclusionData.Keys) {
-                                    $productExclusions += "`n      $fieldName`:"
                                     $fieldValue = $exclusionData[$fieldName]
 
-                                    # Handle both array and single values
-                                    if ($fieldValue -is [Array]) {
+                                    if ($null -eq $fieldValue) { continue }
+
+                                    $policyBlock += "`n      $fieldName`:"
+
+                                    if ($fieldValue -is [array]) {
                                         foreach ($item in $fieldValue) {
-                                            $productExclusions += "`n        - $item"
+                                            $policyBlock += "`n        - $item"
                                         }
                                     } else {
-                                        $productExclusions += "`n        - $fieldValue"
+                                        $policyBlock += "`n        - $fieldValue"
                                     }
                                 }
                             }
                         }
                     }
+
+                    # Append the entire block only ONCE per policy
+                    if ($policyBlock.Count -gt 0) {
+                        $productExclusions += $policyBlock
+                    }
                 }
 
-                if ($productHasExclusions) {
+                if ($productExclusions.Count -gt 0) {
+                    $yamlPreview += "`n$productName`:"
                     $yamlPreview += $productExclusions
                 }
             }
 
-            # Handle Annotations - Updated for hashtable structure
+            # Handle Annotations - Dynamic version using UIConfig fields
             $annotationCount = 0
             foreach ($productName in $syncHash.Annotations.Keys) {
                 $annotationCount += $syncHash.Annotations[$productName].Count
             }
 
             if ($annotationCount -gt 0) {
-                $yamlPreview += "`n`nAnnotatePolicy:"
+                # Get the YAML section name from UIConfig
+                $annotationSectionName = $syncHash.UIConfigs.inputTypes.annotation.value
+                $yamlPreview += "`n`n$annotationSectionName`:"
 
                 # Group annotations by product
                 foreach ($productName in $syncHash.Annotations.Keys) {
-                    $yamlPreview += "`n  # $productName Annotations:"
+                    #$yamlPreview += "`n  # $productName Annotations:"
 
                     # Sort policies by ID
                     $sortedPolicies = $syncHash.Annotations[$productName].Keys | Sort-Object
                     foreach ($policyId in $sortedPolicies) {
-                        $annotation = $syncHash.Annotations[$productName][$policyId]
+                        $annotationData = $syncHash.Annotations[$productName][$policyId]
 
                         # Get policy details from baselines
                         $policyInfo = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
@@ -3212,34 +3612,64 @@ Function Invoke-SCuBAConfigAppUI {
 
                         $yamlPreview += "`n  $policyId`:"
 
-                        if ($annotation.Comment -match "`n") {
-                            # Use quoted string format with \n for line breaks
-                            $escapedComment = $annotation.Comment.Replace('"', '""').Replace("`n", "\n")
-                            $yamlPreview += "`n    Comment: `"$escapedComment`""
-                        } else {
-                            $yamlPreview += "`n    Comment: `"$($annotation.Comment)`""
+                        # Access the nested annotation data correctly
+                        # The structure is: $syncHash.Annotations[Product][PolicyId][AnnotationType][FieldName]
+                        # We need to get the annotation type (like "Annotate") first
+                        foreach ($annotationType in $annotationData.Keys) {
+                            $annotation = $annotationData[$annotationType]
+
+                            # Process fields in the order defined in UIConfig
+                            $annotationFields = $syncHash.UIConfigs.inputTypes.annotation.fields
+                            foreach ($field in $annotationFields) {
+                                $fieldValue = $annotation[$field.value]
+
+                                if ($null -ne $fieldValue -and ![string]::IsNullOrEmpty($fieldValue)) {
+                                    # Handle different field types
+                                    if ($field.type -eq "boolean") {
+                                        $yamlPreview += "`n    $($field.value): $($fieldValue.ToString().ToLower())"
+                                    }
+                                    elseif ($field.type -eq "longstring" -or $field.type -eq "string") {
+                                        if ($fieldValue -match "`n") {
+                                            # Use quoted string format with \n for line breaks
+                                            $escapedValue = $fieldValue.Replace('"', '""').Replace("`n", "\n")
+                                            $yamlPreview += "`n    $($field.value): `"$escapedValue`""
+                                        } else {
+                                            $yamlPreview += "`n    $($field.value): `"$fieldValue`""
+                                        }
+                                    }
+                                    elseif ($field.type -eq "dateString") {
+                                        $yamlPreview += "`n    $($field.value): $fieldValue"
+                                    }
+                                    else {
+                                        # Default handling
+                                        $yamlPreview += "`n    $($field.value): $fieldValue"
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            # Handle Omissions - Updated for hashtable structure
+            # Handle Omissions - Dynamic version using UIConfig fields
             $omissionCount = 0
             foreach ($productName in $syncHash.Omissions.Keys) {
                 $omissionCount += $syncHash.Omissions[$productName].Count
             }
 
             if ($omissionCount -gt 0) {
-                $yamlPreview += "`n`nOmitPolicy:"
+                # Get the YAML section name from UIConfig
+                $omissionSectionName = $syncHash.UIConfigs.inputTypes.omissions.value
+                $yamlPreview += "`n`n$omissionSectionName`:"
 
                 # Group omissions by product
                 foreach ($productName in $syncHash.Omissions.Keys) {
-                    $yamlPreview += "`n  # $productName Omissions:"
+                    #$yamlPreview += "`n  # $productName Omissions:"
 
                     # Sort policies by ID
                     $sortedPolicies = $syncHash.Omissions[$productName].Keys | Sort-Object
                     foreach ($policyId in $sortedPolicies) {
-                        $omission = $syncHash.Omissions[$productName][$policyId]
+                        $omissionData = $syncHash.Omissions[$productName][$policyId]
 
                         # Get policy details from baselines
                         $policyInfo = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
@@ -3250,9 +3680,41 @@ Function Invoke-SCuBAConfigAppUI {
                         }
 
                         $yamlPreview += "`n  $policyId`:"
-                        $yamlPreview += "`n    Rationale: $($omission.Rationale)"
-                        if ($omission.Expiration) {
-                            $yamlPreview += "`n    Expiration: $($omission.Expiration)"
+
+                        # Access the nested omission data correctly
+                        # The structure is: $syncHash.Omissions[Product][PolicyId][OmissionType][FieldName]
+                        # We need to get the omission type (like "Omit") first
+                        foreach ($omissionType in $omissionData.Keys) {
+                            $omission = $omissionData[$omissionType]
+
+                            # Process fields in the order defined in UIConfig
+                            $omissionFields = $syncHash.UIConfigs.inputTypes.omissions.fields
+                            foreach ($field in $omissionFields) {
+                                $fieldValue = $omission[$field.value]
+
+                                if ($null -ne $fieldValue -and ![string]::IsNullOrEmpty($fieldValue)) {
+                                    # Handle different field types
+                                    if ($field.type -eq "boolean") {
+                                        $yamlPreview += "`n    $($field.value): $($fieldValue.ToString().ToLower())"
+                                    }
+                                    elseif ($field.type -eq "longstring" -or $field.type -eq "string") {
+                                        if ($fieldValue -match "`n") {
+                                            # Use quoted string format with \n for line breaks
+                                            $escapedValue = $fieldValue.Replace('"', '""').Replace("`n", "\n")
+                                            $yamlPreview += "`n    $($field.value): `"$escapedValue`""
+                                        } else {
+                                            $yamlPreview += "`n    $($field.value): `"$fieldValue`""
+                                        }
+                                    }
+                                    elseif ($field.type -eq "dateString") {
+                                        $yamlPreview += "`n    $($field.value): $fieldValue"
+                                    }
+                                    else {
+                                        # Default handling
+                                        $yamlPreview += "`n    $($field.value): $fieldValue"
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -3269,12 +3731,19 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }#end function : New-YamlPreview
 
+        #>
         #===========================================================================
         # RESET: NEW SESSION
         #===========================================================================
-        Function Reset-UIFields {
+        Function Clear-FieldValue {
+            <#
+            .SYNOPSIS
+            Clears all field values and resets the UI to default state.
+            .DESCRIPTION
+            This function resets all configuration data structures and UI controls to their initial empty state for starting a new session.
+            #>
 
-            # Reset core data structures
+            # Clear core data structures
             $syncHash.Exclusions = @{}
             $syncHash.Omissions = @{}
             $syncHash.Annotations = @{}
@@ -3325,7 +3794,7 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                 }
-                Write-DebugOutput -Message "Reset control: $controlName" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                Write-DebugOutput -Message "Cleared value for: $controlName" -Source $MyInvocation.MyCommand.Name -Level "Verbose"
             }
 
             # Reset specific UI elements that need special handling
@@ -3356,10 +3825,16 @@ Function Invoke-SCuBAConfigAppUI {
             # Mark data as changed to trigger UI update
             Set-DataChanged
 
-        }#end function : Reset-UIFields
+        }#end function : Clear-FieldValue
 
         # Function to collect general settings from UI controls
         Function Save-GeneralSettingsFromInput {
+            <#
+            .SYNOPSIS
+            Saves general settings from UI controls to data structures.
+            .DESCRIPTION
+            This function collects values from UI controls and stores them in the GeneralSettings data structure for YAML export.
+            #>
 
             # Collect ProductNames from checked checkboxes - use helper function
             #Update-ProductNames
@@ -3380,7 +3855,7 @@ Function Invoke-SCuBAConfigAppUI {
                             $syncHash.GeneralSettings[$settingName] = $currentValue.Trim()
                         }
                     }
-                    If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Collected Main setting: $placeholderKey = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected Main setting: $placeholderKey = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                 }
             }
 
@@ -3390,7 +3865,7 @@ Function Invoke-SCuBAConfigAppUI {
                 if ($selectedEnv) {
                     $syncHash.GeneralSettings["M365Environment"] = $selectedEnv
                 }
-                If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Collected M365Environment: $selectedEnv" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected M365Environment: $selectedEnv" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
             }
 
             # Collect from advanced settings
@@ -3411,7 +3886,7 @@ Function Invoke-SCuBAConfigAppUI {
                         $settingName = $advancedKey -replace '_CheckBox$', ''
                         $syncHash.GeneralSettings[$settingName] = $control.IsChecked
                     }
-                    If($syncHash.DebugMode -match 'Timer|All'){Write-DebugOutput -Message "Collected Advanced setting: $settingName = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Info"}
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected Advanced setting: $settingName = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                 }
             }
 
@@ -3421,6 +3896,61 @@ Function Invoke-SCuBAConfigAppUI {
         #===========================================================================
         # Make UI functional
         #===========================================================================
+        Function Initialize-DynamicTabs {
+            <#
+            .SYNOPSIS
+            Initializes dynamic tab content for product-specific policy configurations.
+            .DESCRIPTION
+            This function sets up dynamic tabs for different baseline controls, creating appropriate containers and UI elements for policy management.
+            #>
+            .SYNOPSIS
+            Initializes dynamic tab content for product-specific policy configurations.
+            .DESCRIPTION
+            This function creates and configures dynamic tabs for annotations, omissions, and exclusions based on the product configurations.
+            #>
+            foreach ($baselineControl in $syncHash.UIConfigs.baselineControls) {
+                # Skip if this is the special exclusions case (handled differently due to product support)
+                if ($baselineControl.dataControlOutput -eq "Exclusions") {
+                    continue  # Handle exclusions with existing logic due to supportsExclusions
+                }
+
+                # Create tab
+                $tab = New-Object System.Windows.Controls.TabItem
+                $tab.Name = $baselineControl.dataControlOutput + "Tab"
+                $tab.Header = $baselineControl.tabName
+                $tab.IsEnabled = $false
+
+                # Create tab content with nested product tabs
+                $tabContent = New-Object System.Windows.Controls.Grid
+                $tabContent.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{ Height = "Auto" }))
+                $tabContent.RowDefinitions.Add((New-Object System.Windows.Controls.RowDefinition -Property @{ Height = "*" }))
+
+                # Header information
+                $headerBorder = New-Object System.Windows.Controls.Border
+                $headerBorder.Style = $syncHash.Window.FindResource("Card")
+                $headerBorder.Margin = "0,0,0,16"
+                [System.Windows.Controls.Grid]::SetRow($headerBorder, 0)
+
+                $headerText = New-Object System.Windows.Controls.TextBlock
+                $headerText.Name = $baselineControl.dataControlOutput + "TabInfo_TextBlock"
+                $headerText.TextWrapping = "Wrap"
+                $headerBorder.Child = $headerText
+                [void]$tabContent.Children.Add($headerBorder)
+
+                # Product tab control
+                $productTabControl = New-Object System.Windows.Controls.TabControl
+                $productTabControl.Name = $baselineControl.dataControlOutput + "ProductTabControl"
+                [System.Windows.Controls.Grid]::SetRow($productTabControl, 1)
+                [void]$tabContent.Children.Add($productTabControl)
+
+                $tab.Content = $tabContent
+
+                # Add to main tab control
+                [void]$syncHash.MainTabControl.Items.Add($tab)
+                $syncHash.($tab.Name) = $tab
+            }
+        }
+
         #update version
         $syncHash.Version_TextBlock.Text = "v$($syncHash.UIConfigs.Version)"
 
@@ -3432,8 +3962,6 @@ Function Invoke-SCuBAConfigAppUI {
         } else {
             $syncHash.DebugTab.Visibility = "Collapsed"
         }
-
-
 
         #override locale context
         foreach ($localeElement in $syncHash.UIConfigs.localeContext.PSObject.Properties) {
@@ -3474,8 +4002,10 @@ Function Invoke-SCuBAConfigAppUI {
             $comboItem.Tag = $env.id
 
             $syncHash.M365Environment_ComboBox.Items.Add($comboItem)
-            Write-DebugOutput -Message "M365Environment ComboBox added: $($env.displayName) ($($env.name))" -Source "UI Launch" -Level "Info"
+            Write-DebugOutput -Message "M365Environment_ComboBox added: $($env.displayName) ($($env.name))" -Source "UI Launch" -Level "Info"
         }
+
+        Add-ControlEventHandler -Control $syncHash.M365Environment_ComboBox
 
         # Set selection based on parameter or defa          ult to first item
         if ($syncHash.M365Environment) {
@@ -3490,7 +4020,7 @@ Function Invoke-SCuBAConfigAppUI {
             # Set default selection to first item if no parameter specified
             $syncHash.M365Environment_ComboBox.SelectedIndex = 0
         }
-        Write-DebugOutput -Message "M365 Environment ComboBox set: $($syncHash.M365Environment_ComboBox.SelectedItem.Content)" -Source "UI Update" -Level "Info"
+        Write-DebugOutput -Message "M365Environment_ComboBox set: $($syncHash.M365Environment_ComboBox.SelectedItem.Content)" -Source "UI Update" -Level "Info"
 
         # Populate Products Checkbox dynamically within the ProductsGrid
         #only list three rows then use next column
@@ -3530,7 +4060,7 @@ Function Invoke-SCuBAConfigAppUI {
                 # Add to GeneralSettings if not already present
                 if ($syncHash.GeneralSettings.ProductNames -notcontains $productId) {
                     $syncHash.GeneralSettings.ProductNames += $productId
-                    Write-DebugOutput -Message "Added $productId to ProductNames data" -Source "User Action" -Level "Info"
+                    Write-DebugOutput -Message "Added [$productId] to ProductNames data" -Source "User Action" -Level "Info"
                 }
 
                 #enable the main tabs
@@ -3544,9 +4074,13 @@ Function Invoke-SCuBAConfigAppUI {
                 Write-DebugOutput -Message "Omit Policy sub tab enabled: $($productId)" -Source "UI Update" -Level "Info"
 
                 $container = $syncHash.("$($productId)OmissionContent")
+                <#
                 if ($container -and $container.Children.Count -eq 0) {
                     New-ProductOmissions -ProductName $productId -Container $container
                 }
+                #>
+                New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Omissions"
+
 
                 #annotations tab
                 $AnnotationTab = $syncHash.("$($productId)AnnotationTab")
@@ -3554,9 +4088,12 @@ Function Invoke-SCuBAConfigAppUI {
                 Write-DebugOutput -Message "Annotation sub tab enabled: $($productId)" -Source "UI Update" -Level "Info"
 
                 $container = $syncHash.("$($productId)AnnotationContent")
+                <#
                 if ($container -and $container.Children.Count -eq 0) {
                     New-ProductAnnotations -ProductName $productId -Container $container
                 }
+                #>
+                New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Annotations"
 
                 #exclusions tab
                 if ($product.supportsExclusions)
@@ -3566,9 +4103,12 @@ Function Invoke-SCuBAConfigAppUI {
                     Write-DebugOutput -Message "Exclusion sub tab enabled: $($productId)" -Source "UI Update" -Level "Info"
 
                     $container = $syncHash.("$($productId)ExclusionContent")
+                    <#
                     if ($container -and $container.Children.Count -eq 0) {
                         New-ProductExclusions -ProductName $productId -Container $container
                     }
+                    #>
+                    New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Exclusions"
                 }
 
                 # Mark data as changed for timer to pick up
@@ -3599,7 +4139,7 @@ Function Invoke-SCuBAConfigAppUI {
                 # Remove from GeneralSettings
                 if ($syncHash.GeneralSettings.ProductNames -contains $productId) {
                     $syncHash.GeneralSettings.ProductNames = $syncHash.GeneralSettings.ProductNames | Where-Object { $_ -ne $productId }
-                    Write-DebugOutput -Message "Removed $productId from ProductNames data" -Source "User Action" -Level "Info"
+                    Write-DebugOutput -Message "Removed [$productId] from ProductNames data" -Source "User Action" -Level "Info"
                 }
 
                 # Clear data for this product
@@ -3701,11 +4241,11 @@ Function Invoke-SCuBAConfigAppUI {
         }
 
         # Add event to placeholder TextBoxes
-        $PlaceholderTextBoxes = $syncHash.UIConfigs.localePlaceholder
-        Foreach($placeholderKey in $PlaceholderTextBoxes.PSObject.Properties.Name) {
+        foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
             $control = $syncHash.$placeholderKey
             if ($control -is [System.Windows.Controls.TextBox]) {
-                Initialize-PlaceholderTextBox -TextBox $control -PlaceholderText $PlaceholderTextBoxes.$placeholderKey
+                $placeholderText = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
+                Initialize-PlaceholderTextBox -TextBox $control -PlaceholderText $placeholderText
             }
         }
 
@@ -3714,7 +4254,12 @@ Function Invoke-SCuBAConfigAppUI {
             try {
                 $tenantDetails = (Invoke-MgGraphRequest -Method GET -Uri "$GraphEndpoint/v1.0/organization").Value
                 $tenantName = ($tenantDetails.VerifiedDomains | Where-Object { $_.IsDefault -eq $true }).Name
-                Initialize-PlaceholderTextBox -TextBox $syncHash.Organization_TextBox -PlaceholderText $syncHash.UIConfigs.localePlaceholder.Organization_TextBox -InitialValue $tenantName
+                $syncHash.Organization_TextBox.Text = $tenantName
+                $syncHash.Organization_TextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                $syncHash.Organization_TextBox.FontStyle = [System.Windows.FontStyles]::Normal
+                $syncHash.Organization_TextBox.BorderBrush = [System.Windows.Media.Brushes]::Gray
+                $syncHash.Organization_TextBox.BorderThickness = "1"
+                $syncHash.Organization_TextBox.isEnabled = $false # Disable editing if Graph is connected
             } catch {
                 # Fallback to placeholder if Graph request fails
                 Initialize-PlaceholderTextBox -TextBox $syncHash.Organization_TextBox -PlaceholderText $syncHash.UIConfigs.localePlaceholder.Organization_TextBox
@@ -3728,16 +4273,16 @@ Function Invoke-SCuBAConfigAppUI {
         # Add global event handlers to dynamically created remove button
         <#
         foreach($button in $syncHash.GetEnumerator() | Where-Object { $_.Value -is 'System.Windows.Controls.Button' }) {
-            Add-ControlEventHandlers -Control $syncHash.$($button.Name)
+            Add-ControlEventHandler -Control $syncHash.$($button.Name)
         }
         #>
 
         # New Session Button
         $syncHash.NewSessionButton.Add_Click({
-            $result = [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localeInfoMessages.NewSessionConfirmation, "New Session", [System.Windows.MessageBoxButton]::YesNo, [System.Windows.MessageBoxImage]::Question)
+            $result = [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.NewSessionConfirmation, "New Session", [System.Windows.MessageBoxButton]::YesNo, [System.Windows.MessageBoxImage]::Question)
             if ($result -eq [System.Windows.MessageBoxResult]::Yes) {
                 # Reset all form fields
-                Reset-UIFields
+                Clear-FieldValue
             }
         })
 
@@ -3765,7 +4310,7 @@ Function Invoke-SCuBAConfigAppUI {
                     # Trigger UI update through reactive system
                     Set-DataChanged
 
-                    [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localeInfoMessages.ImportSuccess, "Import Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                    [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.ImportSuccess, "Import Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                 }
                 catch {
                     [System.Windows.MessageBox]::Show("Error importing configuration: $($_.Exception.Message)", "Import Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
@@ -3782,7 +4327,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Organization validation (required)
                 $orgValid = Confirm-UIField -UIElement $syncHash.Organization_TextBox `
-                                        -RegexPattern "^(.*\.)?(onmicrosoft\.com|onmicrosoft\.us)$" `
+                                        -RegexPattern $syncHash.UIConfigs.valueValidations.tenantDomain.pattern `
                                         -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.OrganizationValidation `
                                         -PlaceholderText $syncHash.UIConfigs.localePlaceholder.Organization_TextBox `
                                         -Required `
@@ -3791,6 +4336,8 @@ Function Invoke-SCuBAConfigAppUI {
                 if (-not $orgValid) {
                     $overallValid = $false
                     $errorMessages += $syncHash.UIConfigs.localeErrorMessages.OrganizationValidation
+                    #navigate to General tab
+                    $syncHash.MainTabControl.SelectedItem = $syncHash.MainTab
                 }
 
                 # Advanced Tab Validations (only if sections are toggled on)
@@ -3800,7 +4347,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                     # AppID validation (GUID format)
                     $appIdValid = Confirm-UIField -UIElement $syncHash.AppId_TextBox `
-                                                    -RegexPattern "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" `
+                                                    -RegexPattern $syncHash.UIConfigs.valueValidations.guid.pattern `
                                                     -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.AppIdValidation `
                                                     -PlaceholderText $syncHash.UIConfigs.localePlaceholder.AppId_TextBox `
                                                     -ShowMessageBox:$false
@@ -3808,11 +4355,12 @@ Function Invoke-SCuBAConfigAppUI {
                     if (-not $appIdValid) {
                         $overallValid = $false
                         $errorMessages += $syncHash.UIConfigs.localeErrorMessages.AppIdValidation
+                        $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
                     }
 
                     # Certificate Thumbprint validation (40 character hex)
                     $certValid = Confirm-UIField -UIElement $syncHash.CertificateThumbprint_TextBox `
-                                                -RegexPattern "^[0-9a-fA-F]{40}$" `
+                                                -RegexPattern $syncHash.UIConfigs.valueValidations.thumbprint.pattern `
                                                 -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.CertificateValidation `
                                                 -PlaceholderText $syncHash.UIConfigs.localePlaceholder.CertificateThumbprint_TextBox `
                                                 -ShowMessageBox:$false
@@ -3820,6 +4368,7 @@ Function Invoke-SCuBAConfigAppUI {
                     if (-not $certValid) {
                         $overallValid = $false
                         $errorMessages += $syncHash.UIConfigs.localeErrorMessages.CertificateValidation
+                        $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
                     }
                 }
 
@@ -4029,33 +4578,66 @@ Function Invoke-SCuBAConfigAppUI {
 
         #Add smooth closing for Window
         $syncHash.Window.Add_Loaded({ $syncHash.isLoaded = $True })
-    	$syncHash.Window.Add_Closing({ $syncHash.isClosing = $True; Close-UIMainWindow})
-    	$syncHash.Window.Add_Closed({
-            if ($syncHash.UIUpdateTimer) {
-                $syncHash.UIUpdateTimer.Stop()
-                $syncHash.UIUpdateTimer = $null
+    	$syncHash.Window.Add_Loaded({
+            $syncHash.isLoaded = $true
+            Write-Host "Window loaded successfully" -ForegroundColor Green
+        })
+
+        # Closing event - called when user closes window or Close() is called
+        $syncHash.Window.Add_Closing({
+            #param($sender, $e)
+
+            # Only run cleanup if not already closing
+            if (-not $syncHash.isClosing) {
+                $syncHash.isClosing = $true
+
+                # Run cleanup but DON'T call window.Close() again
+                try {
+                    # Run memory cleanup
+                    if ($syncHash.InvokeMemoryCleanup) {
+                        $syncHash.InvokeMemoryCleanup.Invoke($true)
+                    }
+
+                    # Run cleanup but skip the window closing part
+                    Close-UIMainWindow
+
+                } catch {
+                    Write-Error "Error during closing cleanup: $($_.Exception.Message)"
+                }
             }
-            if ($syncHash.DebugFlushTimer) {
-                $syncHash.DebugFlushTimer.Stop()
-                $syncHash.DebugFlushTimer.Dispose()
+        })
+
+        # Closed event - called after window is fully closed
+        $syncHash.Window.Add_Closed({
+
+            # Final cleanup
+            try {
+                if ($syncHash.UIUpdateTimer) {
+                    $syncHash.UIUpdateTimer.Stop()
+                    $syncHash.UIUpdateTimer = $null
+                }
+                if ($syncHash.DebugFlushTimer) {
+                    $syncHash.DebugFlushTimer.Stop()
+                    $syncHash.DebugFlushTimer.Dispose()
+                    $syncHash.DebugFlushTimer = $null
+                }
+
+                $syncHash.isClosed = $true
+
+                # Final aggressive memory cleanup
+                [System.GC]::Collect()
+                [System.GC]::WaitForPendingFinalizers()
+                [System.GC]::Collect()
+
+            } catch {
+                Write-Error "Error in final cleanup: $($_.Exception.Message)"
             }
-            $syncHash.isClosed = $True
         })
 
         #always force windows on bottom
         $syncHash.Window.Topmost = $True
 
-        # Add global event handlers to all UI controls after everything is loaded
-         Write-DebugOutput -Message "Adding event handlers to all controls" -Source "UI Initialization" -Level "Info"
-        $allControls = Find-AllControls -Parent $syncHash.Window
-        foreach ($control in $allControls) {
-            try {
-                Write-DebugOutput -Message "Adding event handlers to control: $($control.Name)" -Source "UI Initialization" -Level "Info"
-                Add-ControlEventHandlers -Control $control
-            } catch {
-                Write-DebugOutput -Message "Failed to add event handler to control: $($_.Exception.Message)" -Source "UI Initialization" -Level "Warning"
-            }
-        }
+
 
         $syncHash.UIUpdateTimer.Start()
 

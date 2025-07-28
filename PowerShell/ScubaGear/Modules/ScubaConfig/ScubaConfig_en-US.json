@@ -1,5 +1,5 @@
 {
-  "DebugMode": "none",
+  "DebugMode": "Verbose",
   "Version": "1.10.0",
   "localeContext": {
     "Title_TextBlock": "Scuba Configuration Editor",
@@ -8,7 +8,7 @@
     "Products_TextBlock": "Select at least one product:",
     "ExclusionsInfo_TextBlock": "Exclusions are supported for the following products: {0}",
     "ExclusionsTabInfo_TextBlock": "Configure exclusions for specific policies. Exclusions allow you to customize policy behavior by excluding specific users, groups, domains, or other entities from policy evaluation. Products must be selected on the main page before configuring exclusions.",
-    "OmissionsTabInfo_TextBlock": "Select policies to omit from the assessment and provide justification. Products must be selected on the main page before configuring omissions.",
+    "OmissionsTabInfo_TextBlock": "Select policies to omissions from the assessment and provide justification. Products must be selected on the main page before configuring omissions.",
     "PreviewTabInfo_TextBlock": "Preview your configuration before saving. Ensure all exclusions and omissions are correctly set."
   },
   "localePlaceholder" : {
@@ -18,6 +18,94 @@
     "Description_TextBox" : "Enter a description for this configuration (optional)",
     "AppId_TextBox" : "Enter Application ID (GUID format)",
     "CertificateThumbprint_TextBox" : "Enter Certificate Thumbprint (40 hexadecimal)"
+  },
+  "localeInfoMessages": {
+    "NoPoliciesAvailable": "No policies available for this product.",
+    "PolicySaving": "Saving {0} for policy: {1}",
+    "CollectedArrayField": "Collected array field [{0}][{1}]: {2}",
+    "CollectedBooleanField": "Collected boolean field [{0}][{1}]: {2}",
+    "CollectedStringField": "Collected string field [{0}][{1}]: {2}",
+    "MergedCardField": "{0} merged for [{1}][{2}][{3}]: {4}"
+  },
+  "localeVerboseMessages": {
+      "NewFieldCardSearch": "Looking for field: {0} (type: {1})",
+      "ControlFieldProcessing": "Processing {0} Field: {1}",
+      "ControlFieldCardSearch": "Looking for control: {0} (type: {1})",
+      "DynamicPlaceholders": "Dynamic placeholders for validation: {0}",
+      "RequiredFieldCheck": "Checking required field: {0}(control: {1})",
+      "RequiredFieldHasValue": "Required field has value: {0}"
+  },
+  "localeErrorMessages": {
+    "CertificateNotFound": "No suitable certificates found in the current user's personal certificate store.",
+    "WindowError": "Error loading",
+    "OrganizationValidation" : "Organization Name is required and must be in format: example.onmicrosoft.com or example.onmicrosoft.us",
+    "AppIdValidation": "Application ID must be in GUID format (e.g., 12345678-1234-1234-1234-123456789abc)",
+    "CertificateValidation": "Certificate Thumbprint must be 40 hexadecimal characters",
+    "PreviewValidation": "Please review all fields for errors before proceeding.",
+    "CopyError": "No YAML content to copy. Please generate the configuration first.",
+    "DownloadNullError": "No YAML content to download. Please generate the configuration first",
+    "NewFieldCardWarning": "Warning: Field '{0}' not found in {1} data for {2}",
+    "InvalidEmailFormat": "Invalid email format. Please use format: user@domain.com",
+    "InvalidGuidFormat": "Invalid GUID format. Please use format: 12345678-1234-1234-1234-123456789abc",
+    "InvalidDomainFormat": "Invalid domain format. Please use format: example.com",
+    "InvalidIpAddressFormat": "Invalid IP address format. Please use format: 192.168.1.1",
+    "InvalidFieldValue": "Value cannot be empty",
+    "FieldSelectionError": "Error selecting {0}: {1}",
+    "InputDataNotFound": "Input data [{0}] not found in configuration",
+    "ListContainerNotFound": "List container not found or empty for: {0}",
+    "BooleanFieldNotFound": "Boolean field not found for: {0}",
+    "StringFieldNotFound": "String textbox not found or empty for: {0}",
+    "NoEntriesCollected": "No entries collected for {0} fields: {1}",
+    "NoEntriesFound": "No entries found for {0} fields: {1}",
+    "RequiredFieldValidation": "Required field '{0}' cannot be empty",
+    "RequiredFieldsValidation": "The following required fields cannot be empty: {0}",
+    "InvalidFieldFormat" : "Invalid {0} format. Please use format: {1}",
+    "RequiredFieldMissing": "Required field missing: {0}",
+    "SkippingNullCard": "Skipping null card for policy: {0}",
+    "NoBaselineControlConfigFound": "No baseline control configuration found for: {0}",
+    "RemoveEventHandlerError" : "Failed to remove event handler for: {0}"
+  },
+  "localeDebugOutput":{
+    "UIInitializationInfo": "UI initialization started - creating timer and data structures",
+    "UITimerDebug" : "Data changes detected - updating UI displays",
+    "UITimerError" : "Error in UI update timer {0}",
+    "ControlEventAdd" : "Adding event handlers for {0}: {1}",
+    "ControlEventSelect" : "User changed a {0} named [{1}] value to: {2}",
+    "SetControlWarning" : "Setting warning for {0}: {1}",
+    "SetComboBoxInfo" : "Setting ComboBox info for {0}: {1}",
+    "SetComboBoxWarning" : "Could not find ComboBox [{0}] with value: {1}",
+    "UpdateGeneralSettingInfo": "No UI control found for setting: {0}",
+    "UpdateGeneralSettingError" : "Error updating general settings UI: {0}",
+    "UpdateProductNameDebug": "Selecting all products due to '*' value",
+    "DisableProductTabsDebug": "Disabled main tabs - no products selected",
+    "CreatedOmissionContentDebug": "Created omission content for: {0}",
+    "CreatedAnnotationContentDebug": "Created annotation content for: {0}",
+    "CreatedExclusionContentDebug": "Created exclusion content for: {0}",
+    "EnabledTabsAndContentDebug": "Enabled tabs and ensured content for: {0}",
+    "UpdatedCheckboxesAndTabsDebug" : "Updated checkboxes and tabs for products: {0}",
+    "ErrorUpdatingExclusionUI" : "Error updating exclusion UI for {0}: {1}",
+    "ErrorUpdatingOmissionUI" : "Error updating omission UI for {0}: {1}",
+    "ErrorUpdatingAnnotationUI" : "Error updating annotation UI for {0}: {1}",
+    "UpdatedProductNamesDebug" : "Updated ProductNames in GeneralSettings: {0}",
+    "YamlImportNoProductSelectedWarning" : "No ProductNames selected, returning empty array for YAML",
+    "YamlAllProductsSelectedInfo" : "All products selected, returning '*' for YAML output",
+    "YamlSpecificProductListInfo" : "Returning specific product list for YAML: {0}",
+    "AnnotationCardProductRemovedInfo" : "Removed [{0}] from product [{1}]",
+    "AnnotationRemoveUserAction" : "User confirmed removal of annotation for policy: {0}"
+  },
+  "localePopupMessages": {
+    "NewSessionConfirmation": "Are you sure you want to start a new session? This will clear all current selections and configurations.",
+    "ImportSuccess": "Configuration imported successfully.",
+    "CopySuccess": "YAML configuration copied to clipboard successfully.",
+    "AnnotationSavedSuccess": "[{0}] annotation saved successfully.",
+    "AnnotationRemoveSuccess": "[{0}] annotation removed successfully.",
+    "AnnotationRemoveConfirmation": "Are you sure you want to remove the annotation for [{0}]?",
+    "DuplicateEntry": "Value already exists in the list.",
+    "FieldSelectionError": "There was an error selecting {0}: {1}",
+    "CardSavedSuccess": "[{0}] {1} saved successfully for: {2}",
+    "NoEntriesFound" : "No {0} entries entered. Please fill in at least one field in any of the available {0} fields.",
+    "RemoveCardPolicyConfirmation" : "Are you sure you want to remove all {0} for [{1}]?",
+    "RemoveCardEntrySuccess" : "[{0}] {1} removed successfully."
   },
   "defaultAdvancedSettings": {
     "OutPath_TextBox" : ".",
@@ -32,21 +120,6 @@
     "OpaPath_TextBox" : ".",
     "LogIn_CheckBox" : true,
     "DisconnectOnExit_CheckBox" : false
-  },
-  "localeInfoMessages": {
-    "NewSessionConfirmation": "Are you sure you want to start a new session? This will clear all current selections and configurations.",
-    "ImportSuccess": "Configuration imported successfully.",
-    "CopySuccess": "YAML configuration copied to clipboard successfully."
-  },
-  "localeErrorMessages": {
-    "CertificateNotFound": "No suitable certificates found in the current user's personal certificate store.",
-    "WindowError": "Error loading",
-    "OrganizationValidation" : "Organization Name is required and must be in format: name.onmicrosoft.com or name.onmicrosoft.us",
-    "AppIdValidation": "Application ID must be in GUID format (e.g., 12345678-1234-1234-1234-123456789abc)",
-    "CertificateValidation": "Certificate Thumbprint must be 40 hexadecimal characters",
-    "PreviewValidation": "Please review all fields for errors before proceeding.",
-    "CopyError": "No YAML content to copy. Please generate the configuration first.",
-    "DownloadNullError": "No YAML content to download. Please generate the configuration first"
   },
   "products": [
     {
@@ -112,1075 +185,1563 @@
       "rationale": "Production environment for DOD tenants."
     }
   ],
+  "baselineControls": [
+    {
+        "tabName": "Exclusions",
+        "yamlValue": "[ProductName][PolicyId]",
+        "dataControlOutput": "Exclusions",
+        "fieldControlName": "exclusionField",
+        "defaultFields": "none",
+        "cardName": "Exclusion",
+        "showFieldType": true,
+        "showDescription": false,
+        "supportsAllProducts": false
+    },
+    {
+        "tabName": "Annotate Policies",
+        "yamlValue": "AnnotatePolicy",
+        "dataControlOutput": "Annotations",
+        "fieldControlName": "annotationField",
+        "defaultFields": "annotation",
+        "cardName": "Annotate",
+        "showFieldType": false,
+        "showDescription": true,
+        "supportsAllProducts": true
+    },
+    {
+        "tabName": "Omit Policies",
+        "yamlValue": "OmitPolicy",
+        "dataControlOutput": "Omissions",
+        "fieldControlName": "omissionField",
+        "defaultFields": "omissions",
+        "cardName": "Omit",
+        "showFieldType": false,
+        "showDescription": true,
+        "supportsAllProducts": true
+    }
+  ],
   "baselines": {
-    "teams": [
+    "Teams": [
       {
         "id": "MS.TEAMS.1.1v1",
         "name": "External meeting participants SHOULD NOT be enabled to request control of shared desktops or windows.",
-        "exclusionType": "none",
         "rationale": "An external participant with control of a shared screen could potentially perform unauthorized actions on the shared screen. This policy reduces that risk by removing an external participant's ability to request control. However, if an agency has a legitimate use case to grant this control, it may be done on a case-by-case basis.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.1.2v1",
         "name": "Anonymous users SHALL NOT be enabled to start meetings.",
-        "exclusionType": "none",
         "rationale": "For agencies that implemented custom policies providing more flexibility to some users to automatically admit \"everyone\" to a meeting - this policy provides protection from anonymous users starting meeting to scrape internal contacts.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.1.3v1",
         "name": "Anonymous users and dial-in callers SHOULD NOT be admitted automatically.",
-        "exclusionType": "none",
         "rationale": "Automatically allowing admittance to anonymous and dial-in users diminishes control of meeting participation and invites potential data breach. This policy reduces that risk by requiring all anonymous and dial-in users to wait in a lobby until admitted by an authorized meeting participant. If the agency has a use case to admit members of specific trusted organizations and/or B2B guests automatically, custom policies may be created and assigned to authorized meeting organizers.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.1.4v1",
         "name": "Internal users SHOULD be admitted automatically.",
-        "exclusionType": "none",
         "rationale": "Requiring internal users to wait in the lobby for explicit admission can lead to admission fatigue. This policy enables internal users to be automatically admitted to the meeting through global policy.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.1.5v1",
         "name": "Dial-in users SHOULD NOT be enabled to bypass the lobby.",
-        "exclusionType": "none",
         "rationale": "Automatically admitting dial-in users reduces control over who can participate in a meeting and increases potential for data breaches. This policy reduces the risk by requiring all dial-in users to wait in a lobby until they are admitted by an authorized meeting participant.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.1.6v1",
         "name": "Meeting recording SHOULD be disabled.",
-        "exclusionType": "none",
         "rationale": "Allowing any user to record a Teams meeting or group call may lead to unauthorized disclosure of shared information, including audio, video, and shared screens. By disabling the meeting recording setting in the Global (Org-wide default) meeting policy, an agency limits information exposure.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.1.7v2",
         "name": "Record an event SHOULD NOT be set to Always record.",
-        "exclusionType": "none",
         "rationale": "Allowing to always record Live Events can pose data and video recording leakage and other security risks. Limiting recording permissions to only the organizer minimizes the security risk to the organizer's discretion for these Live Events. Administrators can also disable recording for all live events.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.2.1v1",
         "name": "External access for users SHALL only be enabled on a per-domain basis.",
-        "exclusionType": "none",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation",
         "rationale": "The default configuration allows members to communicate with all external users with similar access permissions. This unrestricted access can lead to data breaches and other security threats. This policy provides protection against threats posed by unrestricted access by allowing communication with only trusted domains.",
         "criticality": "SHALL"
       },
       {
         "id": "MS.TEAMS.2.2v1",
         "name": "Unmanaged users SHALL NOT be enabled to initiate contact with internal users.",
-        "exclusionType": "none",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation",
         "rationale": "Allowing contact from unmanaged users can expose users to email and contact address harvesting. This policy provides protection against this type of harvesting.",
         "criticality": "SHALL"
       },
       {
         "id": "MS.TEAMS.2.3v1",
         "name": "Internal users SHOULD NOT be enabled to initiate contact with unmanaged users.",
-        "exclusionType": "none",
         "rationale": "Contact with unmanaged users can pose the risk of data leakage and other security threats. This policy provides protection by disabling internal user access to unmanaged users.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.3.1v1",
         "name": "Contact with Skype users SHALL be blocked.",
-        "exclusionType": "none",
         "rationale": "Microsoft is officially retiring all forms of Skype as listed above. Allowing contact with Skype users puts agency users at additional security risk.  By blocking contact with Skype users an agency limits access to security threats utilizing the vulnerabilities of the Skype product.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.4.1v1",
         "name": "Teams email integration SHALL be disabled.",
-        "exclusionType": "none",
         "rationale": "Microsoft Teams email integration associates a Microsoft, not tenant domain, email address with a Teams channel. Channel emails are addressed using the Microsoft-owned domain <code>&lt;teams.ms&gt;</code>. By disabling Teams email integration, an agency prevents potentially sensitive Teams messages from being sent through external email gateways.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.5.1v1",
         "name": "Agencies SHOULD only allow installation of Microsoft apps approved by the agency.",
-        "exclusionType": "none",
         "rationale": "Allowing Teams integration with all Microsoft apps can expose the agency to potential vulnerabilities present in those apps. By only allowing specific apps and blocking all others, the agency will better manage its app integration and potential exposure points.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.5.2v1",
         "name": "Agencies SHOULD only allow installation of third-party apps approved by the agency.",
-        "exclusionType": "none",
         "rationale": "Allowing Teams integration with third-party apps can expose the agency to potential vulnerabilities present in an app not managed by the agency. By allowing only specific apps approved by the agency and blocking all others, the agency can limit its exposure to third-party app vulnerabilities.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.5.3v1",
         "name": "Agencies SHOULD only allow installation of custom apps approved by the agency.",
-        "exclusionType": "none",
         "rationale": "Allowing custom apps integration can expose the agency to potential vulnerabilities present in an app not managed by the agency. By allowing only specific apps approved by the agency and blocking all others, the agency can limit its exposure to custom app vulnerabilities.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.6.1v1",
         "name": "A DLP solution SHALL be enabled. The selected DLP solution SHOULD offer services comparable to the native DLP solution offered by Microsoft.",
-        "exclusionType": "none",
         "rationale": "Teams users may inadvertently disclose sensitive information to unauthorized individuals. Data loss prevention policies provide a way for agencies to detect and prevent unauthorized disclosures.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.6.2v1",
         "name": "The DLP solution SHALL protect personally identifiable information (PII)",
-        "exclusionType": "none",
         "rationale": "Teams users may inadvertently share sensitive information with others who should not have access to it. Data loss prevention policies provide a way for agencies to detect and prevent unauthorized sharing of sensitive information.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.7.1v1",
         "name": "Attachments included with Teams messages SHOULD be scanned for malware.",
-        "exclusionType": "none",
         "rationale": "Teams can be used as a mechanism for delivering malware. In many cases, malware can be detected through scanning, reducing the risk for end users.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.7.2v1",
         "name": "Users SHOULD be prevented from opening or downloading files detected as malware.",
-        "exclusionType": "none",
         "rationale": "Teams can be used as a mechanism for delivering malware. In many cases, malware can be detected through scanning, reducing the risk for end users.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.8.1v1",
         "name": "URL comparison with a blocklist SHOULD be enabled.",
-        "exclusionType": "none",
         "rationale": "Users may be directed to malicious websites via links in Teams. Blocking access to known malicious URLs can help prevent users from accessing known malicious websites.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.TEAMS.8.2v1",
         "name": "User click tracking SHOULD be enabled.",
-        "exclusionType": "none",
         "rationale": "Users may click on malicious links in Teams, leading to compromise or authorized data disclosure. Enabling user click tracking lets agencies know if a malicious link may have been visited after the fact to help tailor a response to a potential incident.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ],
-    "aad": [
+    "Aad": [
       {
         "id": "MS.AAD.1.1v1",
         "name": "Legacy authentication SHALL be blocked.",
-        "exclusionType": "capolicy",
         "rationale": "The security risk of allowing legacy authentication protocols is they do not support MFA. Blocking legacy protocols reduces the impact of user credential theft.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.2.1v1",
         "name": "Users detected as high risk SHALL be blocked.",
-        "exclusionType": "capolicy",
         "rationale": "Blocking high-risk users may prevent compromised accounts from accessing the tenant.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.2.2v1",
         "name": "A notification SHOULD be sent to the administrator when high-risk users are detected.",
-        "exclusionType": "none",
         "rationale": "Notification enables the admin to monitor the event and remediate the risk. This helps the organization proactively respond to cyber intrusions as they occur.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.2.3v1",
         "name": "Sign-ins detected as high risk SHALL be blocked.",
-        "exclusionType": "capolicy",
         "rationale": "This prevents compromised accounts from accessing the tenant.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.1v1",
         "name": "Phishing-resistant MFA SHALL be enforced for all users.",
-        "exclusionType": "capolicy",
         "rationale": "Weaker forms of MFA do not protect against sophisticated phishing attacks. By enforcing methods resistant to phishing, those risks are minimized.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.2v1",
         "name": "If phishing-resistant MFA has not been enforced, an alternative MFA method SHALL be enforced for all users.",
-        "exclusionType": "capolicy",
         "rationale": "This is a stopgap security policy to help protect the tenant if phishing-resistant MFA has not been enforced. This policy requires MFA enforcement, thus reducing single-form authentication risk.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.3v2",
         "name": "If Microsoft Authenticator is enabled, it SHALL be configured to show login context information.",
-        "exclusionType": "none",
         "rationale": "This policy helps protect the tenant when Microsoft Authenticator is used by showing user context information, which helps reduce MFA phishing compromises.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.4v1",
         "name": "The Authentication Methods Manage Migration feature SHALL be set to Migration Complete.",
-        "exclusionType": "none",
         "rationale": "To disable the legacy authentication methods screen for the tenant, configure the Manage Migration feature to Migration Complete. The MFA and Self-Service Password Reset (SSPR) authentication methods are both managed from a central admin page, thereby reducing administrative complexity and potential security misconfigurations.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.5v1",
         "name": "The authentication methods SMS, Voice Call, and Email One-Time Passcode (OTP) SHALL be disabled.",
-        "exclusionType": "none",
         "rationale": "SMS, voice call, and email OTP are the weakest authenticators. This policy forces users to use stronger MFA methods.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.6v1",
         "name": "Phishing-resistant MFA SHALL be required for highly privileged roles.",
-        "exclusionType": "capolicy",
         "rationale": "This is a backup security policy to help protect privileged access to the tenant if the conditional access policy, which requires MFA for all users, is disabled or misconfigured.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.7v1",
         "name": "Managed devices SHOULD be required for authentication.",
-        "exclusionType": "capolicy",
         "rationale": "The security risk of an adversary authenticating to the tenant from their own device is reduced by requiring a managed device to authenticate. Managed devices are under the provisioning and control of the agency. [OMB-22-09](https://www.whitehouse.gov/wp-content/uploads/2022/01/M-22-09.pdf) states, \"When authorizing users to access resources, agencies must consider at least one device-level signal alongside identity information about the authenticated user.\"",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.8v1",
         "name": "Managed Devices SHOULD be required to register MFA.",
-        "exclusionType": "capolicy",
         "rationale": "Reduce risk of an adversary using stolen user credentials and then registering their own MFA device to access the tenant by requiring a managed device provisioned and controlled by the agency to perform registration actions. This prevents the adversary from using their own unmanaged device to perform the registration.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.3.9v1",
         "name": "Device code authentication SHOULD be blocked.",
-        "exclusionType": "capolicy",
         "rationale": "The device code authentication flow has been abused to compromise user accounts via phishing. Since most organizations using M365 don't need device code authentication, blocking it mitigates the risk.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "capolicy",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.4.1v1",
         "name": "Security logs SHALL be sent to the agency's security operations center for monitoring.",
-        "exclusionType": "none",
         "rationale": "The security risk of not having visibility into cyber attacks is reduced by collecting logs in the agency’s centralized security detection infrastructure. This makes security events available for auditing, query, and incident response.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.5.1v1",
         "name": "Only administrators SHALL be allowed to register applications.",
-        "exclusionType": "none",
         "rationale": "Application access for the tenant presents a heightened security risk compared to interactive user access because applications are typically not subject to critical security protections, such as MFA policies. Reduce risk of unauthorized users installing malicious applications into the tenant by ensuring that only specific privileged users can register applications.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.5.2v1",
         "name": "Only administrators SHALL be allowed to consent to applications.",
-        "exclusionType": "none",
         "rationale": "Limiting applications consent to only specific privileged users reduces risk of users giving insecure applications access to their data via [consent grant attacks](https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/detect-and-remediate-illicit-consent-grants?view=o365-worldwide).",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.5.3v1",
         "name": "An admin consent workflow SHALL be configured for applications.",
-        "exclusionType": "none",
         "rationale": "Configuring an admin consent workflow reduces the risk of the previous policy by setting up a process for users to securely request access to applications necessary for business purposes. Administrators have the opportunity to review the permissions requested by new applications and approve or deny access based on a risk assessment.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.6.1v1",
         "name": "User passwords SHALL NOT expire.",
-        "exclusionType": "none",
         "rationale": "The National Institute of Standards and Technology (NIST), OMB, and Microsoft have published guidance indicating mandated periodic password changes make user accounts less secure. For example, OMB-22-09 states, \"Password policies must not require use of special characters or regular rotation.\"",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.1v1",
         "name": "A minimum of two users and a maximum of eight users SHALL be provisioned with the Global Administrator role.",
-        "exclusionType": "none",
         "rationale": "The Global Administrator role provides unfettered access to the tenant. Limiting the number of users with this level of access makes tenant compromise more challenging. Microsoft recommends fewer than five users in the Global Administrator role. However, additional user accounts, up to eight, may be necessary to support emergency access and some operational scenarios.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.2v1",
         "name": "Privileged users SHALL be provisioned with finer-grained roles instead of Global Administrator.",
-        "exclusionType": "none",
         "rationale": "Many privileged administrative users do not need unfettered access to the tenant to perform their duties. By assigning them to roles based on least privilege, the risks associated with having their accounts compromised are reduced.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.3v1",
         "name": "Privileged users SHALL be provisioned cloud-only accounts separate from an on-premises directory or other federated identity providers.",
-        "exclusionType": "none",
         "rationale": "By provisioning cloud-only Microsoft Entra ID user accounts to privileged users, the risks associated with a compromise of on-premises federation infrastructure are reduced. It is more challenging for the adversary to pivot from the compromised environment to the cloud with privileged access.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.4v1",
         "name": "Permanent active role assignments SHALL NOT be allowed for highly privileged roles.",
-        "exclusionType": "role",
         "rationale": "Instead of giving users permanent assignments to privileged roles, provisioning access just in time lessens exposure if those accounts become compromised. In Microsoft Entra ID PIM or an alternative PAM system, just in time access can be provisioned by assigning users to roles as eligible instead of perpetually active.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "role",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.5v1",
         "name": "Provisioning users to highly privileged roles SHALL NOT occur outside of a PAM system.",
-        "exclusionType": "none",
         "rationale": "Provisioning users to privileged roles within a PAM system enables enforcement of numerous privileged access policies and monitoring. If privileged users are assigned directly to roles in the M365 admin center or via PowerShell outside of the context of a PAM system, a significant set of critical security capabilities are bypassed.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.6v1",
         "name": "Activation of the Global Administrator role SHALL require approval.",
-        "exclusionType": "none",
         "rationale": "Requiring approval for a user to activate Global Administrator, which provides unfettered access, makes it more challenging for an attacker to compromise the tenant with stolen credentials and it provides visibility of activities indicating a compromise is taking place.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.7v1",
         "name": "Eligible and Active highly privileged role assignments SHALL trigger an alert.",
-        "exclusionType": "none",
         "rationale": "Closely monitor assignment of the highest privileged roles for signs of compromise. Send assignment alerts to enable the security monitoring team to detect compromise attempts.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.8v1",
         "name": "User activation of the Global Administrator role SHALL trigger an alert.",
-        "exclusionType": "none",
         "rationale": "Closely monitor activation of the Global Administrator role for signs of compromise. Send activation alerts to enable the security monitoring team to detect compromise attempts.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.AAD.7.9v1",
         "name": "User activation of other highly privileged roles SHOULD trigger an alert.",
-        "exclusionType": "none",
         "rationale": "Closely monitor activation of high-risk roles for signs of compromise. Send activation alerts to enable the security monitoring team to detect compromise attempts. In some environments, activating privileged roles can generate a significant number of alerts.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ],
-    "exo": [
+    "Exo": [
       {
         "id": "MS.EXO.1.1v2",
         "name": "Automatic forwarding to external domains SHALL be disabled.",
-        "exclusionType": "forwardingDomains",
         "rationale": "Adversaries can use automatic forwarding to gain",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": ["forwardingDomains","preferredDNSResolvers","skipDoH"],
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.2.2v2",
         "name": "An SPF policy SHALL be published for each domain that fails all non-approved senders.",
-        "exclusionType": "none",
         "rationale": "An adversary may modify the `FROM` field",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.3.1v1",
         "name": "DKIM SHOULD be enabled for all domains.",
-        "exclusionType": "none",
         "rationale": "An adversary may modify the `FROM` field",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.4.1v1",
         "name": "A DMARC policy SHALL be published for every second-level domain.",
-        "exclusionType": "none",
         "rationale": "Without a DMARC policy available for each domain, recipients",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.4.2v1",
         "name": "The DMARC message rejection option SHALL be p=reject.",
-        "exclusionType": "none",
         "rationale": "Of the three policy options (i.e., none, quarantine, and reject),",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.4.3v1",
         "name": "The DMARC point of contact for aggregate reports SHALL include `reports@dmarc.cyber.dhs.gov`.",
-        "exclusionType": "none",
         "rationale": "Email spoofing attempts are not inherently visible to domain",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.4.4v1",
         "name": "An agency point of contact SHOULD be included for aggregate and failure reports.",
-        "exclusionType": "none",
         "rationale": "Email spoofing attempts are not inherently visible to domain",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.5.1v1",
         "name": "SMTP AUTH SHALL be disabled.",
-        "exclusionType": "none",
         "rationale": "SMTP AUTH is not used or needed by modern email clients.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.6.1v1",
         "name": "Contact folders SHALL NOT be shared with all domains.",
-        "exclusionType": "none",
         "rationale": "Contact folders may contain information that should not be shared by default with all domains. Disabling sharing with all domains closes an avenue for data exfiltration while still allowing",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.6.2v1",
         "name": "Calendar details SHALL NOT be shared with all domains.",
-        "exclusionType": "none",
         "rationale": "Calendar details may contain information that should not be shared by default with all domains. Disabling sharing with all domains closes an avenue for data exfiltration while still allowing",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.7.1v1",
         "name": "External sender warnings SHALL be implemented.",
-        "exclusionType": "none",
         "rationale": "Phishing is an ever-present threat. Alerting users when email originates from outside their organization can encourage them to exercise increased caution, especially if an email is one they expected from an internal sender.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.8.1v2",
         "name": "A DLP solution SHALL be used.",
-        "exclusionType": "none",
         "rationale": "Users may inadvertently disclose sensitive information to unauthorized individuals. A DLP solution may detect the presence of sensitive information in Exchange Online and block access to unauthorized entities.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.8.2v2",
         "name": "The DLP solution SHALL protect personally identifiable information (PII) and sensitive information, as defined by the agency.",
-        "exclusionType": "none",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation",
         "rationale": "Users may inadvertently share sensitive information with others who should not have access to it. Data loss prevention policies provide a way for agencies to detect and prevent unauthorized disclosures.",
         "criticality": "SHALL"
       },
       {
         "id": "MS.EXO.8.3v1",
         "name": "The selected DLP solution SHOULD offer services comparable to the native DLP solution offered by Microsoft.",
-        "exclusionType": "none",
         "rationale": "Any alternative DLP solution should be able to detect sensitive information in Exchange Online and block access to unauthorized entities.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.8.4v1",
         "name": "At a minimum, the DLP solution SHALL restrict sharing credit card numbers, U.S. Individual Taxpayer Identification Numbers (ITIN), and U.S. Social Security numbers (SSN) via email.",
-        "exclusionType": "none",
         "rationale": "Users may inadvertently share sensitive information with others who should not have access to it. Data loss prevention policies provide a way for agencies to detect and prevent unauthorized disclosures.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.9.1v2",
         "name": "Emails SHALL be filtered by attachment file types.",
-        "exclusionType": "none",
         "rationale": "Malicious attachments often take the form of click-to-run files.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.9.2v1",
         "name": "The attachment filter SHOULD attempt to determine the true file type and assess the file extension.",
-        "exclusionType": "none",
         "rationale": "Users can change a file extension at the end of a file name (e.g., notepad.exe to notepad.txt) to obscure the actual file type. Verifying the file type and checking that this matches the designated file extension can help detect instances where the file extension was changed.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.9.3v2",
         "name": "Disallowed file types SHALL be determined and enforced.",
-        "exclusionType": "none",
         "rationale": "Malicious attachments often take the form of click-to-run files,",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.9.4v1",
         "name": "Alternatively chosen filtering solutions SHOULD offer services comparable to Microsoft Defender's Common Attachment Filter.",
-        "exclusionType": "none",
         "rationale": "Malicious attachments often take the form of click-to-run files.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.9.5v1",
         "name": "At a minimum, click-to-run files SHOULD be blocked (e.g., .exe, .cmd, and .vbe).",
-        "exclusionType": "none",
         "rationale": "Malicious attachments often take the form of click-to-run files.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.10.1v1",
         "name": "Emails SHALL be scanned for malware.",
-        "exclusionType": "none",
         "rationale": "Email can be used as a mechanism for delivering malware.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.10.2v1",
         "name": "Emails identified as containing malware SHALL be quarantined or dropped.",
-        "exclusionType": "none",
         "rationale": "Email can be used as a mechanism for delivering malware.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.10.3v1",
         "name": "Email scanning SHALL be capable of reviewing emails after delivery.",
-        "exclusionType": "none",
         "rationale": "As known malware signatures are updated, it is possible for an email to be retroactively identified as containing malware after delivery. By scanning emails, the number of malware-infected in users' mailboxes can be reduced.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.11.1v1",
         "name": "Impersonation protection checks SHOULD be used.",
-        "exclusionType": "none",
         "rationale": "Users might not be able to reliably identify phishing emails, especially",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.11.2v1",
         "name": "User warnings, comparable to the user safety tips included with EOP, SHOULD be displayed.",
-        "exclusionType": "none",
         "rationale": "Many tasks are better suited for automated processes, such as identifying",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.11.3v1",
         "name": "The phishing protection solution SHOULD include an AI-based phishing detection tool comparable to EOP Mailbox Intelligence.",
-        "exclusionType": "none",
         "rationale": "Phishing attacks can result in unauthorized data disclosure and unauthorized access. Using AI-based phishing detection tools to improve the detection rate of phishing attempts helps reduce the risk of successful phishing attacks.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.12.1v1",
         "name": "IP allow lists SHOULD NOT be created.",
-        "exclusionType": "none",
         "rationale": "Messages sent from IP addresses on an allow list bypass important",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.12.2v1",
         "name": "Safe lists SHOULD NOT be enabled.",
-        "exclusionType": "none",
         "rationale": "Messages sent from allowed safe list addresses bypass important",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.13.1v1",
         "name": "Mailbox auditing SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Exchange Online user accounts can be compromised or misused. Enabling mailbox auditing provides a valuable source of information to detect and respond to mailbox misuse.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.14.1v2",
         "name": "A spam filter SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Spam is a constant threat as junk mail can reduce user productivity, fill up mailboxes unnecessarily, and in some cases include malicious links or attachments. Filtering out spam reduces user workload burden, prevents junk mail congestion, and reduces potentially malicious content exposure.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.14.2v1",
         "name": "Spam and high confidence spam SHALL be moved to either the junk email folder or the quarantine folder.",
-        "exclusionType": "none",
         "rationale": "Spam is a constant threat as junk mail can reduce user productivity, fill up mailboxes unnecessarily, and in some cases include malicious links or attachments.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.14.3v1",
         "name": "Allowed domains SHALL NOT be added to inbound anti-spam protection policies.",
-        "exclusionType": "none",
         "rationale": "Legitimate emails may be incorrectly filtered",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.14.4v1",
         "name": "If a third-party party filtering solution is used, the solution SHOULD offer services comparable to the native spam filtering offered by Microsoft.",
-        "exclusionType": "none",
         "rationale": "Spam is a constant threat as junk mail can reduce user productivity, fill up mailboxes unnecessarily, and in some cases include malicious links or attachments. Filtering out spam reduces user workload burden, prevents junk mail congestion, and reduces potentially malicious content exposure.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.15.1v1",
         "name": "URL comparison with a block-list SHOULD be enabled.",
-        "exclusionType": "none",
         "rationale": "Users may be directed to malicious websites via links in email. Blocking access to known, malicious URLs can prevent users from accessing known malicious websites.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.15.2v1",
         "name": "Direct download links SHOULD be scanned for malware.",
-        "exclusionType": "none",
         "rationale": "URLs in emails may direct users to download and run malware.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.15.3v1",
         "name": "User click tracking SHOULD be enabled.",
-        "exclusionType": "none",
         "rationale": "Users may click on malicious links in emails, leading to compromise or unauthorized data disclosure. Enabling user click tracking lets agencies know if a malicious link may have been visited after the fact to help tailor a response to a potential incident.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.16.1v1",
         "name": "At a minimum, the following alerts SHALL be enabled:",
-        "exclusionType": "none",
         "rationale": "Potentially malicious or service impacting events may go",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.16.2v1",
         "name": "The alerts SHOULD be sent to a monitored address or incorporated into a security information and event management (SIEM) system.",
-        "exclusionType": "none",
         "rationale": "Suspicious or malicious events, if not resolved promptly, may",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.17.1v1",
         "name": "Unified Audit logging SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Responding to incidents without detailed information about activities that took place slows response actions. Enabling Unified Audit logging helps ensure agencies have visibility into user actions. Furthermore, enabling the Unified Audit log is required for government agencies by OMB M-21-31.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.EXO.17.3v1",
         "name": "Audit logs SHALL be maintained for at least the minimum duration dictated by OMB M-21-31 (Appendix C).",
-        "exclusionType": "none",
         "rationale": "Audit logs may no longer be available when needed if they",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ],
-    "powerbi": [
+    "Powerbi": [
       {
         "id": "MS.POWERBI.1.1v1",
         "name": "The Publish to Web feature SHOULD be disabled unless the agency mission requires the capability.",
-        "exclusionType": "none",
         "rationale": "A publicly accessible web URL can be accessed by everyone, including malicious actors. This policy limits information available on the public web that is not specifically allowed to be published.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.2.1v1",
         "name": "Guest user access to the Power BI tenant SHOULD be disabled unless the agency mission requires the capability.",
-        "exclusionType": "none",
         "rationale": "Disabling external access to Power BI helps keep guest users from accessing potentially risky data and application programming interfaces (APIs). If an agency needs to allow guest access, this can be limited to users in specific security groups to curb risk.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.3.1v1",
         "name": "The Invite external users to your organization feature SHOULD be disabled unless agency mission requires the capability.",
-        "exclusionType": "none",
         "rationale": "Disabling this feature keeps internal users from inviting guest users. Therefore guest users can be limited from accessing potentially risky data/APIs. If an agency needs to allow guest access, the invitation feature can be limited to users in specific security groups to help limit risk.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.4.1v1",
         "name": "Service principals with access to APIs SHOULD be restricted to specific security groups.",
-        "exclusionType": "none",
         "rationale": "With unrestricted service principals, unwanted access to APIs is possible. Allowing service principals through security groups, and only where necessary, mitigates this risk.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.4.2v1",
         "name": "Service principals creating and using profiles SHOULD be restricted to specific security groups.",
-        "exclusionType": "none",
         "rationale": "With unrestricted service principals creating/using profiles, there is risk of an unauthorized user using a profile with more permissions than they have. Allowing service principals through security groups will mitigate that risk.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.5.1v1",
         "name": "ResourceKey-based authentication SHOULD be blocked unless a specific use case (e.g., streaming and/or PUSH datasets) merits its use.",
-        "exclusionType": "none",
         "rationale": "If resource keys are allowed, someone can move data without Microsoft Entra ID OAuth bearer token, causing possibly malicious or junk data to be stored. Disabling resource keys reduces risk that an unauthorized individual will make changes.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.6.1v1",
         "name": "Python and R interactions SHOULD be disabled.",
-        "exclusionType": "none",
         "rationale": "External code poses a security and privacy risk as there is no good way to regulate what is done with the data or integrations. Disabling this will reduce the risk of a data leak or malicious actor.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERBI.7.1v1",
         "name": "Sensitivity labels SHOULD be enabled for Power BI and employed for sensitive data per enterprise data protection policies.",
-        "exclusionType": "none",
         "rationale": "A document without sensitivity labels may be opened unknowingly, potentially exposing data to someone who is not supposed to have access to it. This policy will help organize and classify data, making it easier to keep data out of the wrong hands.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ],
-    "powerplatform": [
+    "Powerplatform": [
       {
         "id": "MS.POWERPLATFORM.1.1v1",
         "name": "The ability to create production and sandbox environments SHALL be restricted to admins.",
-        "exclusionType": "none",
         "rationale": "Users creating new Power Platform environments may inadvertently bypass data loss prevention (DLP) policy settings or misconfigure the security settings of their environment.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERPLATFORM.1.2v1",
         "name": "The ability to create trial environments SHALL be restricted to admins.",
-        "exclusionType": "none",
         "rationale": "Users creating new Power Platform environments may inadvertently bypass DLP policy settings or misconfigure the security settings of their environment.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERPLATFORM.2.1v1",
         "name": "A DLP policy SHALL be created to restrict connector access in the default Power Platform environment.",
-        "exclusionType": "none",
         "rationale": "All users in the tenant have access to the default Power Platform environment. Those users may inadvertently use connectors that share sensitive information with others who should not have access to it. Users requiring Power Apps should be directed to conduct development in other Power Platform environments with DLP connector policies customized to suit the user's needs while also maintaining the agency's security posture.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERPLATFORM.2.2v1",
         "name": "Non-default environments SHOULD have at least one DLP policy affecting them.",
-        "exclusionType": "none",
         "rationale": "Users may inadvertently use connectors that share sensitive information with others who should not have access to it. DLP policies provide a way for agencies to detect and prevent unauthorized disclosures.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERPLATFORM.3.1v1",
         "name": "Power Platform tenant isolation SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Provides an additional tenant isolation control on top of Microsoft Entra ID tenant isolation specifically for Power Platform applications to prevent accidental or malicious cross tenant information sharing.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.POWERPLATFORM.3.2v1",
         "name": "An inbound/outbound connection allowlist SHOULD be configured.",
-        "exclusionType": "none",
         "rationale": "Depending on agency needs an allowlist can be configured to allow cross tenant collaboration via connectors.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ],
-    "defender": [
+    "Defender": [
       {
         "id": "MS.DEFENDER.1.1v1",
         "name": "The standard and strict preset security policies SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Defender includes a large number of features and settings to protect users against threats. Using the preset security policies, administrators can help ensure all new and existing users automatically have secure defaults applied.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.1.2v1",
         "name": "All users SHALL be added to Exchange Online Protection (EOP) in either the standard or strict preset security policy.",
-        "exclusionType": "none",
         "rationale": "Important user protections are provided by EOP, including anti-spam, anti-malware, and anti-phishing protections. By using the preset policies, administrators can help ensure all new and existing users have secure defaults applied automatically.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.1.3v1",
         "name": "All users SHALL be added to Defender for Office 365 protection in either the standard or strict preset security policy.",
-        "exclusionType": "none",
         "rationale": "Important user protections are provided by Defender for Office 365 protection, including safe attachments and safe links. By using the preset policies, administrators can help ensure all new and existing users have secure defaults applied automatically.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.1.4v1",
         "name": "Sensitive accounts SHALL be added to Exchange Online Protection in the strict preset security policy.",
-        "exclusionType": "sensitiveAccounts",
         "rationale": "Unauthorized access to a sensitive account may result in greater harm than a standard user account. Adding sensitive accounts to the strict preset security policy, with its increased protections, better mitigates their elevated risk to email threats.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "sensitiveAccounts",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.1.5v1",
         "name": "Sensitive accounts SHALL be added to Defender for Office 365 protection in the strict preset security policy.",
-        "exclusionType": "sensitiveAccounts",
         "rationale": "Unauthorized access to a sensitive account may result in greater harm than to a standard user account. Adding sensitive accounts to the strict preset security policy, with its increased protections, better mitigates their elevated risk.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "sensitiveAccounts",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.2.1v1",
         "name": "User impersonation protection SHOULD be enabled for sensitive accounts in both the standard and strict preset policies.",
-        "exclusionType": "sensitiveUsers",
+
         "rationale": "User impersonation, especially of users with access to sensitive or high-value information and resources, has the potential to result in serious harm. Impersonation protection mitigates this risk. By configuring impersonation protection in both preset policies, administrators can help protect email recipients from impersonated emails, regardless of whether they are added to the standard or strict policy.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "sensitiveUsers",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.2.2v1",
         "name": "Domain impersonation protection SHOULD be enabled for domains owned by the agency in both the standard and strict preset policies.",
-        "exclusionType": "agencyDomains",
         "rationale": "Configuring domain impersonation protection for all agency domains reduces the risk of a user being deceived by a look-alike domain. By configuring impersonation protection in both preset policies, administrators can help protect email recipients from impersonated emails, regardless of whether they are added to the standard or strict policy.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "agencyDomains",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.2.3v1",
         "name": "Domain impersonation protection SHOULD be added for important partners in both the standard and strict preset policies.",
-        "exclusionType": "partnerDomains",
         "rationale": "Configuring domain impersonation protection for domains owned by important partners reduces the risk of a user being deceived by a look-alike domain. By configuring impersonation protection in both preset policies, administrators can help protect email recipients from impersonated emails, regardless of whether they are added to the standard or strict policy.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "partnerDomains",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.3.1v1",
         "name": "Safe attachments SHOULD be enabled for SharePoint, OneDrive, and Microsoft Teams.",
-        "exclusionType": "none",
         "rationale": "Clicking malicious links makes users vulnerable to attacks, and this danger is not limited to links in emails. Other Microsoft products, such as Microsoft Teams, can be used to present users with malicious links. As such, it is important to protect users on these other Microsoft products as well.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.4.1v2",
         "name": "A custom policy SHALL be configured to protect PII and sensitive information, as defined by the agency, blocking at a minimum: credit card numbers, U.S. Individual Taxpayer Identification Numbers (ITIN), and U.S. Social Security numbers (SSN).",
-        "exclusionType": "none",
         "rationale": "Users may inadvertently share sensitive information with",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.4.2v1",
         "name": "The custom policy SHOULD be applied to Exchange, OneDrive, SharePoint, Teams chat, and Devices.",
-        "exclusionType": "none",
         "rationale": "Unauthorized disclosures may happen through M365 services",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.4.3v1",
         "name": "The action for the custom policy SHOULD be set to block sharing sensitive information with everyone.",
-        "exclusionType": "none",
         "rationale": "Access to sensitive information should be prohibited unless",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.4.4v1",
         "name": "Notifications to inform users and help educate them on the proper use of sensitive information SHOULD be enabled in the custom policy.",
-        "exclusionType": "none",
         "rationale": "Some users may not be aware of agency policies on",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.4.5v1",
         "name": "A list of apps that are restricted from accessing files protected by DLP policy SHOULD be defined.",
-        "exclusionType": "none",
         "rationale": "Some apps may inappropriately share accessed files or not",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.4.6v1",
         "name": "The custom policy SHOULD include an action to block access to sensitive",
-        "exclusionType": "none",
         "rationale": "Some apps may inappropriately share accessed files",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.5.1v1",
         "name": "At a minimum, the alerts required by the CISA M365 Secure Configuration Baseline for Exchange Online SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Potentially malicious or service-impacting events may go undetected without a means of detecting these events. Setting up a mechanism to alert administrators to the list of events linked above draws attention to them to minimize any impact to users and the agency.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.5.2v1",
         "name": "The alerts SHOULD be sent to a monitored address or incorporated into a Security Information and Event Management (SIEM).",
-        "exclusionType": "none",
         "rationale": "Suspicious or malicious events, if not resolved promptly, may have a greater impact to users and the agency. Sending alerts to a monitored email address or SIEM system helps ensure events are acted upon in a timely manner to limit overall impact.",
-        "criticality": "SHOULD"
+        "criticality": "SHOULD",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.6.1v1",
         "name": "Unified Audit logging SHALL be enabled.",
-        "exclusionType": "none",
         "rationale": "Responding to incidents without detailed information about activities that took place slows response actions. Enabling Unified Audit logging helps ensure agencies have visibility into user actions. Furthermore, enabling the Unified Audit log is required for government agencies by OMB M-21-31.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.DEFENDER.6.3v1",
         "name": "Audit logs SHALL be maintained for at least the minimum duration dictated by OMB M-21-31.",
-        "exclusionType": "none",
         "rationale": "Audit logs may no longer be available when needed if they are not retained for a sufficient time. Increased log retention time gives an agency the necessary visibility to investigate incidents that occurred some time ago.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ],
-    "sharepoint": [
+    "Sharepoint": [
       {
         "id": "MS.SHAREPOINT.1.1v1",
         "name": "External sharing for SharePoint SHALL be limited to Existing guests or Only people in your organization.",
-        "exclusionType": "none",
         "rationale": "Sharing information outside the organization via SharePoint increases the risk of unauthorized access. By limiting external sharing, administrators decrease the risk of access to information.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.1.2v1",
         "name": "External sharing for OneDrive SHALL be limited to Existing guests or Only people in your organization.",
-        "exclusionType": "none",
         "rationale": "Sharing files outside the organization via OneDrive increases the risk of unauthorized access. By limiting external sharing, administrators decrease the risk of unauthorized access to information.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.1.3v1",
         "name": "External sharing SHALL be restricted to approved external domains and/or users in approved security groups per interagency collaboration needs.",
-        "exclusionType": "none",
         "rationale": "By limiting sharing to domains or approved security groups used for interagency collaboration purposes, administrators can help prevent sharing with unknown organizations and individuals.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.2.1v1",
         "name": "File and folder default sharing scope SHALL be set to Specific people (only the people the user specifies).",
-        "exclusionType": "none",
         "rationale": "By making the default sharing the most restrictive, administrators prevent accidentally sharing information too broadly.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.2.2v1",
         "name": "File and folder default sharing permissions SHALL be set to View.",
-        "exclusionType": "none",
         "rationale": "Edit access to files and folders could allow a user to make unauthorized changes.  By restricting default permissions to **View**, administrators prevent unintended or malicious modification.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.3.1v1",
         "name": "Expiration days for Anyone links SHALL be set to 30 days or less.",
-        "exclusionType": "none",
         "rationale": "Links may be used to provide access to information for a short period of time. Without expiration, however, access is indefinite. By setting expiration timers for links, administrators can prevent unintended sustained access to the link.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.3.2v1",
         "name": "The allowable file and folder permissions for links SHALL be set to View only.",
-        "exclusionType": "none",
         "rationale": "Unauthorized changes to files can be made if permissions allow editing by anyone.  By restricting permissions on links to **View** only, administrators prevent anonymous file changes.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       },
       {
         "id": "MS.SHAREPOINT.3.3v1",
         "name": "Reauthentication days for people who use a verification code SHALL be set to 30 days or less.",
-        "exclusionType": "none",
         "rationale": "A verification code may be issued to provide access to information for a short period. By setting expiration timers for verification code access, administrators can prevent unintended sustained access to documents.",
-        "criticality": "SHALL"
+        "criticality": "SHALL",
+        "exclusionField": "none",
+        "omissionField": "omissions",
+        "annotationField": "annotation"
       }
     ]
   },
-  "exclusionTypes": {
+  "inputTypes": {
     "capolicy": {
-      "name": "CapExclusions",
+      "name": "Conditional Access Policy Excluded Groups and Users",
+      "value": "CapExclusions",
       "description": "Exclude specific groups or users from conditional access policies",
       "fields": [
         {
           "type": "array",
-          "name": "Groups",
+          "name": "Group Object Id's",
+          "value": "Groups",
           "description": "Group IDs to exclude from this policy",
-          "valueType": "guid"
+          "valueType": "guid",
+          "required": false
         },
         {
           "type": "array",
-          "name": "Users",
+          "name": "User Object Id's",
+          "value": "Users",
           "description": "User IDs to exclude from this policy",
-          "valueType": "guid"
+          "valueType": "guid",
+          "required": false
         }
       ]
     },
     "role": {
-      "name": "RoleExclusions",
+      "name": "Privilege Identity Management Excluded Roles",
+      "value": "RoleExclusions",
       "description": "Exclude specific groups or users from role requirements",
       "fields": [
         {
           "type": "array",
-          "name": "Groups",
+          "name": "Group Object Id's",
+          "value": "Groups",
           "description": "Group IDs to exclude from this policy",
-          "valueType": "guid"
+          "valueType": "guid",
+          "required": false
         },
         {
           "type": "array",
-          "name": "Users",
+          "name": "User Object Id's",
+          "value": "Users",
           "description": "User IDs to exclude from this policy",
-          "valueType": "guid"
+          "valueType": "guid",
+          "required": false
         }
       ]
     },
     "sensitiveAccounts": {
-      "name": "SensitiveAccounts",
+      "name": "Sensitive Accounts",
+      "value": "SensitiveAccounts",
       "description": "Defines sensitive accounts filters used to select accounts to assign to the strict preset security policy",
       "fields": [
         {
           "type": "array",
-          "name": "IncludedUsers",
+          "name": "Included User Service Principal Names",
+          "value": "IncludedUsers",
           "description": "Users to include as sensitive accounts",
-          "valueType": "email"
+          "valueType": "email",
+          "required": false
         },
         {
           "type": "array",
-          "name": "IncludedGroups",
+          "name": "Included Groups Names",
+          "value": "IncludedGroups",
           "description": "Groups to include as sensitive accounts",
-          "valueType": "string"
+          "valueType": "string",
+          "required": false
         },
         {
           "type": "array",
-          "name": "IncludedDomains",
+          "name": "Included Domain Names",
+          "value": "IncludedDomains",
           "description": "Domains to include as sensitive accounts",
-          "valueType": "domain"
+          "valueType": "domain",
+          "required": false
         },
         {
           "type": "array",
-          "name": "ExcludedUsers",
+          "name": "Excluded User Service Principal Names",
+          "value": "ExcludedUsers",
           "description": "Users to exclude from sensitive accounts",
-          "valueType": "email"
+          "valueType": "email",
+          "required": false
         },
         {
           "type": "array",
-          "name": "ExcludedGroups",
+          "name": "Excluded Groups Names",
+          "value": "ExcludedGroups",
           "description": "Groups to exclude from sensitive accounts",
-          "valueType": "string"
+          "valueType": "string",
+          "required": false
         },
         {
           "type": "array",
-          "name": "ExcludedDomains",
+          "name": "Excluded Domains Names",
+          "value": "ExcludedDomains",
           "description": "Domains to exclude from sensitive accounts",
-          "valueType": "domain"
+          "valueType": "domain",
+          "required": false
         }
       ]
     },
     "sensitiveUsers": {
-      "name": "SensitiveUsers",
+      "name": "Defender's Sensitive Users",
+      "value": "SensitiveUsers",
       "description": "Defines sensitive user accounts by display name and email address",
       "fields": [
         {
           "type": "string",
-          "name": "SensitiveUsers",
+          "name": "Sensitive Users",
+          "value": "SensitiveUsers",
           "description": "Each value should be a string in the form of the display name and email address separated by a semicolon.",
-          "valueType": "semicolonList"
+          "valueType": "semicolonList",
+          "required": false
         }
       ]
     },
     "partnerDomains": {
-      "name": "PartnerDomains",
+      "name": "Partner Domains",
+      "value": "PartnerDomains",
       "description": "Defines a list of frequent partner domain names",
       "fields": [
         {
           "type": "array",
           "name": "PartnerDomains",
+          "value": "PartnerDomains",
           "description": "Defines a list of frequent partner domain names",
-          "valueType": "domain"
+          "valueType": "domain",
+          "required": false
         }
       ]
     },
     "forwardingDomains": {
-      "name": "AllowedForwardingDomains",
+      "name": "Allowed Forwarding Domains",
+      "value": "",
       "description": "Domains allowed for automatic email forwarding",
       "fields": [
         {
           "type": "array",
-          "name": "AllowedForwardingDomains",
+          "name": "Enter domains allowed for forwarding",
+          "value": "AllowedForwardingDomains",
           "description": "List of domains allowed for automatic email forwarding",
-          "valueType": "domain"
+          "valueType": "domain",
+          "required": false
         }
       ]
     },
     "agencyDomains": {
-      "name": "AgencyDomains",
+      "name": "Agency Domains",
+      "value": "AgencyDomains",
       "description": "Defines a list of agency domain names that should be specified",
       "fields": [
         {
           "type": "array",
-          "name": "AgencyDomains",
+          "name": "Agency Domains",
+          "value": "AgencyDomains",
           "description": "Defines a list of agency domain names that should be specified",
-          "valueType": "domain"
+          "valueType": "domain",
+          "required": false
+        }
+      ]
+    },
+    "preferredDNSResolvers": {
+      "name": "Preferred DNS Resolver IP Addresses",
+      "value": "",
+      "description": "Use this parameter to control what DNS resolver is used to fetch the SPF",
+      "fields": [
+        {
+          "type": "array",
+          "name": "Enter preferred DNS resolver IP addresses:",
+          "value": "PreferredDNSResolvers",
+          "description": "Defines a list of preferred DNS resolvers",
+          "valueType": "ipAddress",
+          "required": false
+        }
+      ]
+    },
+    "skipDoH": {
+      "name": "Skip DNS over HTTPS",
+      "value": "",
+      "description": "Use this parameter if you prefer ScubaGear not retry any failed DNS queries",
+      "fields": [
+        {
+          "type": "boolean",
+          "name": "Check to skip DNS over HTTPS:",
+          "value": "SkipDoH",
+          "description": "Set to true to skip DoH for failed DNS queries",
+          "valueType": "boolean",
+          "required": false
+        }
+      ]
+    },
+    "annotation": {
+      "name": "Annotation",
+      "value": "Annotate",
+      "description": "Exercise care when marking incorrect results because this can inadvertently introduce blind spots when assessing your system.",
+      "fields": [
+        {
+          "type": "boolean",
+          "name": "Incorrect Result",
+          "value": "IncorrectResult",
+          "description": "Check to indicate that the result is incorrect",
+          "valueType": "boolean",
+          "required": false
+        },
+        {
+          "type": "longstring",
+          "name": "Comment",
+          "value": "Comment",
+          "description": "The annotation to add to the report. A warning will be printed if control is marked incorrect with no comment provided as justification",
+          "valueType": "string",
+          "required": true
+        },
+        {
+          "type": "dateString",
+          "name": "Remediation Date",
+          "value": "RemediationDate",
+          "description": "The date a failing control is anticipated to be implemented",
+          "valueType": "yearmonthday",
+          "required": false
+        }
+      ]
+    },
+    "omissions":{
+      "name": "Omissions",
+      "Value": "Omit",
+      "description": "Exercise care when omitting policies because this can inadvertently introduce blind spots when assessing your system.",
+      "fields": [
+        {
+          "type": "longstring",
+          "name": "Rationale",
+          "value": "Rationale",
+          "description": "Provide a reason the policy should be omitted from the report",
+          "valueType": "string",
+          "required": true
+        },
+        {
+
+          "type": "dateString",
+          "name": "Expiration Date",
+          "value": "Expiration",
+          "description": "A date after which the policy should no longer be omitted from the report.",
+          "valueType": "yearmonthday",
+          "required": false
         }
       ]
     }
   },
-  "graphQueries": {
-    "capolicy": {
-      "name": "Conditional Access Policies",
-      "endpoint": "/v1.0/identity/conditionalAccess/policies",
-      "queryParameters": {
-        "$select": "id,displayName,state,conditions",
-        "$filter": "state eq 'enabled'"
-      }
+  "valueValidations":{
+    "email": {
+      "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
+      "sample": "user@example.com",
+      "format": "user@example.com"
     },
-    "users": {
+    "domain": {
+      "pattern": "^(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\\.[A-Za-z0-9-]{1,63})+$",
+      "sample": "example.com",
+      "format": "user@example.com"
+    },
+    "ipAddress": {
+      "pattern": "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$",
+      "sample": "192.168.1.1",
+      "format": "x.x.x.x"
+    },
+    "guid": {
+      "pattern": "^[{(]?[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}[)}]?$",
+      "sample": "123e4567-e89b-12d3-a456-426614174000",
+      "format": "123e4567-e89b-12d3-a456-426614174000"
+    },
+    "yearmonthday": {
+      "pattern": "^(19|20)\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$",
+      "sample": "2023-03-15",
+      "format": "yyyy-MM-dd"
+    },
+    "semicolonList": {
+      "pattern": "^([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,};?)+$",
+      "sample": "John Doe;jdoe@example.com",
+      "format": "John Doe;jdoe@example.com"
+    },
+    "thumbprint": {
+      "pattern": "^[A-Fa-f0-9]{40}$",
+      "sample": "1234567890abcdef1234567890abcdef12345678",
+      "format": "1234567890abcdef1234567890abcdef12345678"
+    },
+    "tenantDomain": {
+      "pattern": "^(.*\\.)?(onmicrosoft\\.com|onmicrosoft\\.us)$",
+      "sample": "example.onmicrosoft.com",
+      "format": "example.onmicrosoft.com"
+    }
+  },
+  "graphQueries": {
+    "Users": {
       "name": "Users",
       "endpoint": "/v1.0/users",
       "queryParameters": {
-        "$select": "Id,DisplayName,UserPrincipalName,Mail,AccountEnabled,UserType"
-      }
+        "$select": "id,displayName,userPrincipalName,mail,accountEnabled,userType"
+      },
+      "outProperty": "id",
+      "tipProperty": "displayName"
     },
-    "groups": {
+    "Groups": {
       "name": "Groups",
       "endpoint": "/v1.0/groups",
       "queryParameters": {
-        "$select": "Id,DisplayName,Description,Mail,GroupTypes,SecurityEnabled,MailEnabled"
-      }
+        "$select": "id,displayName,description,mail,groupTypes,securityEnabled,mailEnabled"
+      },
+      "outProperty": "id",
+      "tipProperty": "displayName"
+    },
+    "IncludedUsers": {
+      "name": "Users",
+      "endpoint": "/v1.0/users",
+      "queryParameters": {
+        "$select": "id,displayName,userPrincipalName,mail,accountEnabled,userType"
+      },
+      "outProperty": "userPrincipalName",
+      "tipProperty": "displayName"
+    },
+    "IncludedGroups": {
+      "name": "Groups",
+      "endpoint": "/v1.0/groups",
+      "queryParameters": {
+        "$select": "id,displayName,description,mail,groupTypes,securityEnabled,mailEnabled"
+      },
+      "outProperty": "displayName",
+      "tipProperty": "description"
+    },
+    "ExcludedUsers": {
+      "name": "Users",
+      "endpoint": "/v1.0/users",
+      "queryParameters": {
+        "$select": "id,displayName,userPrincipalName,mail,accountEnabled,userType"
+      },
+      "outProperty": "userPrincipalName",
+      "tipProperty": "displayName"
+    },
+    "ExcludedGroups": {
+      "name": "Groups",
+      "endpoint": "/v1.0/groups",
+      "queryParameters": {
+        "$select": "id,displayName,description,mail,groupTypes,securityEnabled,mailEnabled"
+      },
+      "outProperty": "displayName",
+      "tipProperty": "description"
     }
   }
 }

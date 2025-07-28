@@ -80,19 +80,19 @@ function Get-ScubaConfigRegoExclusionMappings {
         $content = Get-Content -Path $file.FullName -Raw
 
         foreach ($pattern in $patterns.Keys) {
-            $exclusionType = $patterns[$pattern]
+            $exclusionData = $patterns[$pattern]
 
             # Use regex to find matches
-            $matches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $RegoFileContentMatches = [regex]::Matches($content, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
 
-            foreach ($match in $matches) {
-                if ($match.Groups.Count -gt 1) {
-                    $policyId = $match.Groups[1].Value
+            foreach ($regoMatch in $RegoFileContentMatches) {
+                if ($regoMatch.Groups.Count -gt 1) {
+                    $policyId = $regoMatch.Groups[1].Value
 
                     # Only add if it looks like a valid policy ID
                     if ($policyId -match '^MS\.[A-Z]+\.[0-9]+\.[0-9]+v[0-9]+$') {
-                        $exclusionMappings[$policyId] = $exclusionType
-                        Write-Verbose "Found mapping: $policyId -> $exclusionType (from $($file.Name))"
+                        $exclusionMappings[$policyId] = $exclusionData
+                        Write-Verbose "Found mapping: $policyId -> $exclusionData (from $($file.Name))"
                     }
                 }
             }
@@ -250,23 +250,23 @@ function Update-ScubaConfigBaselineWithRego {
 
         foreach ($policy in $policies) {
             # Use Rego mapping if available, otherwise default to "none"
-            $exclusionType = if ($regoMappings.ContainsKey($policy.PolicyId)) {
+            $exclusionData = if ($regoMappings.ContainsKey($policy.PolicyId)) {
                 $regoMappings[$policy.PolicyId]
             } else {
                 "none"
             }
 
             # Track mapping statistics
-            if (-not $mappingStats.ContainsKey($exclusionType)) {
-                $mappingStats[$exclusionType] = 0
+            if (-not $mappingStats.ContainsKey($exclusionData)) {
+                $mappingStats[$exclusionData] = 0
             }
-            $mappingStats[$exclusionType]++
+            $mappingStats[$exclusionData]++
 
             # Create policy object with required fields
             $policyObj = [ordered]@{
                 id = $policy.PolicyId
                 name = $policy.Title
-                exclusionType = $exclusionType
+                exclusionData = $exclusionData
                 rationale = $policy.Rationale
             }
 
@@ -321,15 +321,15 @@ function Update-ScubaConfigBaselineWithRego {
 
     # Show exclusion type statistics
     Write-Output "`nExclusion Type Statistics:"
-    foreach ($exclusionType in ($mappingStats.Keys | Sort-Object)) {
-        Write-Output "  $exclusionType`: $($mappingStats[$exclusionType]) policies"
+    foreach ($exclusionData in ($mappingStats.Keys | Sort-Object)) {
+        Write-Output "  $exclusionData`: $($mappingStats[$exclusionData]) policies"
     }
 
     # Detailed summary
     foreach ($product in $newBaselines.Keys) {
         $policies = $newBaselines[$product]
         $policyCount = $policies.Count
-        $exclusionCounts = $policies | Group-Object exclusionType | ForEach-Object { "$($_.Name): $($_.Count)" }
+        $exclusionCounts = $policies | Group-Object exclusionData | ForEach-Object { "$($_.Name): $($_.Count)" }
         Write-Output "  $product`: $policyCount policies ($($exclusionCounts -join ', '))"
     }
 
@@ -338,6 +338,19 @@ function Update-ScubaConfigBaselineWithRego {
 
 
 function Get-ScubaBaselinePolicy {
+    <#
+    .SYNOPSIS
+    Retrieves the baseline policy for a specific product.
+
+    .PARAMETER BaselineDirectory
+    Specifies the directory containing baseline policy files.
+
+    .PARAMETER GitHubDirectoryUrl
+    Specifies the GitHub directory URL containing baseline policy files.
+
+    .EXAMPLE
+     Get-ScubaBaselinePolicy -BaselineDirectory $BaselineDirectory -GitHubDirectoryUrl $GitHubDirectoryUrl
+    #>
     param(
         [Parameter(Mandatory=$false)]
         [string]$BaselineDirectory,
@@ -508,6 +521,13 @@ function Get-ScubaBaselinePolicy {
 }
 
 function Get-ScubaPolicyContent {
+    <#
+    .SYNOPSIS
+        Retrieves the content of a specific policy from the markdown documentation
+
+    .PARAMETER Content
+        Import markdown content
+    #>
     param([string]$Content)
     $result = @{
         Criticality = $null
