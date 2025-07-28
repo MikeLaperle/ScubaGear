@@ -1,6 +1,6 @@
 {
-  "DebugMode": "Verbose",
-  "Version": "1.10.0",
+  "DebugMode": "None",
+  "Version": "1.12.0",
   "localeContext": {
     "Title_TextBlock": "Scuba Configuration Editor",
     "SubTitle_TextBlock": "Create a ScubaGear configuration file for exclusions, annotations, and omissions",

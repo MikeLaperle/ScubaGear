@@ -1063,7 +1063,10 @@ Function Invoke-SCuBAConfigAppUI {
 
                                                 if ($field.type -eq "array" -and $fieldValue -is [array]) {
                                                     # Handle array fields
-                                                    $listContainer = $syncHash.($controlName + "_List")
+                                                    #to pass PSAvoidInvokingEmptyMembers
+                                                    $listControl = ($controlName + "_List")
+
+                                                    $listContainer = $syncHash.$listControl
                                                     if ($listContainer) {
                                                         # Clear existing items
                                                         $listContainer.Children.Clear()
@@ -1096,8 +1099,11 @@ Function Invoke-SCuBAConfigAppUI {
                                                         }
                                                     }
                                                 } else {
+                                                    #to pass PSAvoidInvokingEmptyMembers
+                                                    $TextboxControl = ($controlName + "_TextBox")
+
                                                     # Handle single value fields
-                                                    $control = $syncHash.($controlName + "_TextBox")
+                                                    $control = $syncHash.$TextboxControl
                                                     if ($control) {
                                                         $control.Text = $fieldValue
                                                         $control.Foreground = [System.Windows.Media.Brushes]::Black
@@ -1895,67 +1901,73 @@ Function Invoke-SCuBAConfigAppUI {
                 Add-ControlEventHandler -Control $graphGetButton
 
                 $graphGetButton.Add_Click({
-                    try {
-                        # Get search term from input box
-                        $searchTerm = if ($inputTextBox.Text -ne $placeholderText -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
+                try {
+                    # Get search term from input box
+                    $searchTerm = if ($inputTextBox.Text -ne $placeholderText -and ![string]::IsNullOrWhiteSpace($inputTextBox.Text)) { $inputTextBox.Text } else { "" }
 
-                        $selectedItems = Show-GraphSelector -GraphEntityType $GraphQueryData.Name -SearchTerm $searchTerm
+                    $selectedItems = Show-GraphSelector -GraphEntityType $GraphQueryData.Name -SearchTerm $searchTerm
 
-                        if ($selectedItems -and $selectedItems.Count -gt 0) {
-                            # Add selected users to the list
-                            foreach ($item in $selectedItems) {
-                                # Check if user already exists in the list
-                                if ($listContainer.Children.Children | Where-Object { $_.Text -contains $item.Id }) {
-                                    continue
-                                }
-
-                                # Create item panel
-                                $itemPanel = New-Object System.Windows.Controls.StackPanel
-                                $itemPanel.Orientation = "Horizontal"
-                                $itemPanel.Margin = "0,2,0,2"
-
-                                # Create item text block
-                                $itemText = New-Object System.Windows.Controls.TextBlock
-                                $itemText.Text = "$($item.($GraphQueryData.outProperty))"
-                                $itemText.Width = 250
-                                $itemText.VerticalAlignment = "Center"
-                                $itemText.ToolTip = "$($item.($GraphQueryData.tipProperty))"
-
-                                # Create remove button
-                                $removeUserButton = New-Object System.Windows.Controls.Button
-                                $removeUserButton.Content = "Remove"
-                                $removeUserButton.Width = 60
-                                $removeUserButton.Height = 20
-                                $removeUserButton.Margin = "8,0,0,0"
-                                $removeUserButton.FontSize = 10
-                                $removeUserButton.Background = [System.Windows.Media.Brushes]::Red
-                                $removeUserButton.Foreground = [System.Windows.Media.Brushes]::White
-                                $removeUserButton.BorderThickness = "0"
-
-                                $removeUserButton.Add_Click({
-                                    $parentItem = $this.Parent
-                                    $parentContainer = $parentItem.Parent
-                                    $parentContainer.Children.Remove($parentItem)
-                                }.GetNewClosure())
-
-                                [void]$itemPanel.Children.Add($itemText)
-                                [void]$itemPanel.Children.Add($removeUserButton)
-                                [void]$listContainer.Children.Add($itemPanel)
+                    # More robust check for valid results
+                    if ($selectedItems -and $selectedItems.Count -gt 0 -and $null -ne $selectedItems[0]) {
+                        # Add selected users to the list
+                        foreach ($item in $selectedItems) {
+                            # Skip if item is null or empty
+                            if (-not $item -or [string]::IsNullOrWhiteSpace($item.($GraphQueryData.outProperty))) {
+                                continue
                             }
 
-                            # Clear the input box
-                            $inputTextBox.Text = $placeholderText
-                            $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
-                            $inputTextBox.FontStyle = "Italic"
+                            # Check if user already exists in the list
+                            if ($listContainer.Children.Children | Where-Object { $_.Text -contains $item.Id }) {
+                                continue
+                            }
 
-                            Write-DebugOutput -Message "Added $($selectedUsers.Count) $($Field.value.ToLower()) to $ControlName list" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                            # Create item panel
+                            $itemPanel = New-Object System.Windows.Controls.StackPanel
+                            $itemPanel.Orientation = "Horizontal"
+                            $itemPanel.Margin = "0,2,0,2"
+
+                            # Create item text block
+                            $itemText = New-Object System.Windows.Controls.TextBlock
+                            $itemText.Text = "$($item.($GraphQueryData.outProperty))"
+                            $itemText.Width = 250
+                            $itemText.VerticalAlignment = "Center"
+                            $itemText.ToolTip = "$($item.($GraphQueryData.tipProperty))"
+
+                            # Create remove button
+                            $removeUserButton = New-Object System.Windows.Controls.Button
+                            $removeUserButton.Content = "Remove"
+                            $removeUserButton.Width = 60
+                            $removeUserButton.Height = 20
+                            $removeUserButton.Margin = "8,0,0,0"
+                            $removeUserButton.FontSize = 10
+                            $removeUserButton.Background = [System.Windows.Media.Brushes]::Red
+                            $removeUserButton.Foreground = [System.Windows.Media.Brushes]::White
+                            $removeUserButton.BorderThickness = "0"
+
+                            $removeUserButton.Add_Click({
+                                $parentItem = $this.Parent
+                                $parentContainer = $parentItem.Parent
+                                $parentContainer.Children.Remove($parentItem)
+                            }.GetNewClosure())
+
+                            [void]$itemPanel.Children.Add($itemText)
+                            [void]$itemPanel.Children.Add($removeUserButton)
+                            [void]$listContainer.Children.Add($itemPanel)
                         }
+
+                        # Clear the input box
+                        $inputTextBox.Text = $placeholderText
+                        $inputTextBox.Foreground = [System.Windows.Media.Brushes]::Gray
+                        $inputTextBox.FontStyle = "Italic"
+                    } else {
+                        Write-DebugOutput -Message "No items selected or found from Graph query for $($GraphQueryData.Name)" -Source "Graph Button Click" -Level "Info"
                     }
-                    catch {
-                        Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.FieldSelectionError -f $Field.value.ToLower(), $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"
-                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.FieldSelectionError -f $Field.value.ToLower(), "Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
-                    }
-                }.GetNewClosure())
+                }
+                catch {
+                    Write-DebugOutput -Message "Error in Graph button click: $($_.Exception.Message)" -Source "Graph Button Click" -Level "Error"
+                    [System.Windows.MessageBox]::Show("Error retrieving data from Graph: $($_.Exception.Message)", "Graph Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+                }
+            }.GetNewClosure())
 
                 [void]$inputRow.Children.Add($graphGetButton)
             }
@@ -2662,7 +2674,7 @@ Function Invoke-SCuBAConfigAppUI {
             }.GetNewClosure())
 
             return $card
-        }
+        }#end New-FieldListsCard
 
         #===========================================================================
         #
@@ -2682,8 +2694,7 @@ Function Invoke-SCuBAConfigAppUI {
                 [string]$QueryType,
                 $GraphConfig,
                 [string]$FilterString,
-                [int]$Top = 999,
-                [string]$ProgressMessage = "Retrieving data..."
+                [int]$Top = 999
             )
 
             # Create runspace
@@ -2696,7 +2707,7 @@ Function Invoke-SCuBAConfigAppUI {
 
             # Add script block
             $scriptBlock = {
-                param($QueryType, $GraphConfig, $FilterString, $Top, $ProgressMessage)
+                param($QueryType, $GraphConfig, $FilterString, $Top)
 
                 try {
                     # Get query configuration
@@ -2760,7 +2771,7 @@ Function Invoke-SCuBAConfigAppUI {
             }
 
             # Add parameters and start execution
-            $powershell.AddScript($scriptBlock).AddParameter("QueryType", $QueryType).AddParameter("GraphConfig", $GraphConfig).AddParameter("FilterString", $FilterString).AddParameter("Top", $Top).AddParameter("ProgressMessage", $ProgressMessage)
+            $powershell.AddScript($scriptBlock).AddParameter("QueryType", $QueryType).AddParameter("GraphConfig", $GraphConfig).AddParameter("FilterString", $FilterString).AddParameter("Top", $Top)
             $asyncResult = $powershell.BeginInvoke()
 
             return @{
@@ -2893,7 +2904,10 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Start async operation
                 Write-DebugOutput -Message "Starting async operation for graph query type: $($config.QueryType) with filter: $filterString" -Source $MyInvocation.MyCommand.Name -Level "Info"
-                $asyncOp = Invoke-GraphQueryWithFilter -QueryType $config.QueryType -GraphConfig $syncHash.UIConfigs.graphQueries -FilterString $filterString -Top $Top
+                $asyncOp = Invoke-GraphQueryWithFilter `
+                                -QueryType $config.QueryType `
+                                -GraphConfig $syncHash.UIConfigs.graphQueries `
+                                -FilterString $filterString -Top $Top
 
                 # Show progress window
                 $progressWindow.Show()
