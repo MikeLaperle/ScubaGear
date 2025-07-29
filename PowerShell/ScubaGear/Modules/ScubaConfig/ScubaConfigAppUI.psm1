@@ -99,9 +99,11 @@ Function Invoke-SCuBAConfigAppUI {
     $syncHash.Omissions = @{}
     $syncHash.Annotations = @{}
     $syncHash.GeneralSettings = @{}
+    $syncHash.AdvancedSettings = @{}
     $syncHash.BulkUpdateInProgress = $false
-    $syncHash.Placeholder = @{}
-    $syncHash.DebugOutputQueue = [System.Collections.Queue]::Synchronized([System.Collections.Queue]::new())
+    $syncHash.DataChanged = $false
+    $syncHash.DebugOutputQueue = [System.Collections.Queue]::Synchronized([System.Collections.Queue]::new())  # first in first out: for debug screen
+    $syncHash.DebugLog = [System.Collections.ArrayList]::Synchronized([System.Collections.ArrayList]::new())  # For debug download
     $syncHash.DebugFlushTimer = $null
     #$syncHash.Theme = $Theme
     #build runspace
@@ -126,7 +128,8 @@ Function Invoke-SCuBAConfigAppUI {
         $reader = New-Object System.Xml.XmlNodeReader ([xml]$UIXML)
         $syncHash.window = [Windows.Markup.XamlReader]::Load($reader)
         $syncHash.UIXML = $UIXML
-        # Store Form Objects In PowerShell
+
+         # Store Form Objects In PowerShell
         $UIXML.SelectNodes("//*[@Name]") | ForEach-Object{ $syncHash."$($_.Name)" = $syncHash.Window.FindName($_.Name)}
 
         function Write-DebugOutput {
@@ -147,7 +150,20 @@ Function Invoke-SCuBAConfigAppUI {
                 $logEntry = "[$timestamp] [$Level] [$Source] $Message"
 
                 $syncHash.DebugOutputQueue.Enqueue($logEntry)
+                [void]$syncHash.DebugLog.Add($logEntry)
             }
+        }
+
+        # Set window icon from DrawingImage resource
+        try {
+            $iconDrawing = $syncHash.Window.FindResource("ScubaGearIconImage")
+            if ($iconDrawing) {
+                $syncHash.Window.Icon = $iconDrawing
+                Write-DebugOutput -Message "Window icon set from DrawingImage" -Source "Icon Creation" -Level "Info"
+            }
+        }
+        catch {
+            Write-DebugOutput -Message "Failed to set window icon: $($_.Exception.Message)" -Source "Icon Creation" -Level "Warning"
         }
 
         #Import UI configuration file
@@ -156,10 +172,45 @@ Function Invoke-SCuBAConfigAppUI {
 
         $syncHash.DebugMode = $syncHash.UIConfigs.DebugMode
 
+        # Initialize-DynamicTabs function should be called BEFORE processing any import
+        Initialize-DynamicTabs
+
+        # Add event to placeholder TextBoxes
+        foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
+            $control = $syncHash.$placeholderKey
+            if ($control -is [System.Windows.Controls.TextBox]) {
+                $placeholderText = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
+                Initialize-PlaceholderTextBox -TextBox $control -PlaceholderText $placeholderText
+            }
+        }
+
         # If YAMLImport is specified, load the YAML configuration
+        # Process YAMLConfigFile parameter AFTER UI is fully initialized
         If($syncHash.YAMLImport){
-            $syncHash.YAMLConfig = Get-Content -Path $syncHash.YAMLImport -Raw | ConvertFrom-Yaml
-            Write-DebugOutput -Message "YAMLConfig loaded: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
+            try {
+                Write-DebugOutput -Message "Processing YAMLConfigFile parameter: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
+                $syncHash.YAMLConfig = Get-Content -Path $syncHash.YAMLImport -Raw | ConvertFrom-Yaml
+                Write-DebugOutput -Message "YAMLConfig loaded: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
+                 
+                # Clear existing data structures
+                $syncHash.Exclusions = @{}
+                $syncHash.Omissions = @{}
+                $syncHash.Annotations = @{}
+                $syncHash.GeneralSettings = @{}
+                $syncHash.AdvancedSettings = @{}
+                
+                # Import the YAML configuration into data structures
+                Import-YamlToDataStructures -Config $syncHash.YAMLConfig
+                Write-DebugOutput -Message "YAMLConfig imported into data structures" -Source "UI Launch" -Level "Info"
+                
+                # Trigger UI update through reactive system
+                Set-DataChanged
+                Write-DebugOutput -Message "YAMLConfig UI update triggered" -Source "UI Launch" -Level "Info"
+            }
+            catch {
+                Write-DebugOutput -Message "Error processing YAMLConfigFile: $($_.Exception.Message)" -Source "UI Launch" -Level "Error"
+                [System.Windows.MessageBox]::Show("Error importing configuration file: $($_.Exception.Message)", "Import Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+            }
         }
 
         $syncHash.Window.Dispatcher.Invoke([Action]{
@@ -196,8 +247,9 @@ Function Invoke-SCuBAConfigAppUI {
 
                         # Trim lines to 1000
                         $lines = $syncHash.Debug_TextBox.Text -split "`r`n"
-                        if ($lines.Count -gt 1000) {
-                            $syncHash.Debug_TextBox.Text = ($lines[-1000..-1] -join "`r`n")
+                        if ($lines.Count -gt 5000) {
+                            $linesToKeep = $lines | Select-Object -Last 5000
+                            $syncHash.Debug_TextBox.Text = ($linesToKeep -join "`r`n")
                         }
                     }
                 }
@@ -206,16 +258,31 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Auto-collect general settings from UI controls
                 Save-GeneralSettingsFromInput
+                Save-AdvancedSettingsFromInput
 
                 # Only update if there have been changes
                 if ($syncHash.DataChanged) {
-                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message $syncHash.UIConfigs.LocaleDebugOutput.UITimerDebug -Source "UI Timer" -Level "Debug"}
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Data changes detected - updating UI displays" -Source "UI Timer" -Level "Debug"}
                     Update-AllUIFromData
                     $syncHash.DataChanged = $false
                 }
 
             } catch {
-                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UITimerError -f $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"}
+                $errorDetails = @{
+                    Message = $_.Exception.Message
+                    Line = $_.InvocationInfo.ScriptLineNumber
+                    Command = $_.InvocationInfo.MyCommand.Name
+                    StackTrace = $_.ScriptStackTrace
+                    FullError = $_.ToString()
+                }
+
+                $detailedErrorMsg = "Error in UI update timer: $($errorDetails.Message) | Line: $($errorDetails.Line) | Command: $($errorDetails.Command)"
+
+                If($syncHash.DebugMode -match 'Debug'){
+                    Write-DebugOutput -Message $detailedErrorMsg -Source "UI Timer" -Level "Error"
+                    Write-DebugOutput -Message "Full Stack Trace: $($errorDetails.StackTrace)" -Source "UI Timer" -Level "Error"
+                }
+
             }
         })
 
@@ -223,7 +290,7 @@ Function Invoke-SCuBAConfigAppUI {
         # Initialize change tracking
         $syncHash.DataChanged = $false
 
-        Write-DebugOutput -Message $syncHash.UIConfigs.LocaleDebugOutput.UIInitializationInfo -Source "UI Initialization" -Level "Info"
+        Write-DebugOutput -Message "UI initialization started - creating timer and data structures" -Source "UI Initialization" -Level "Info"
 
         $syncHash.LastUpdateHash = @{
             Exclusions = ""
@@ -748,7 +815,7 @@ Function Invoke-SCuBAConfigAppUI {
         }
 
         # Function to validate UI field based on regex and required status
-        Function Confirm-UIField {
+        Function Confirm-RequiredField {
             <#
             .SYNOPSIS
             Validates UI field values using regex patterns and required field checks.
@@ -760,12 +827,14 @@ Function Invoke-SCuBAConfigAppUI {
                 [string]$RegexPattern,
                 [string]$ErrorMessage,
                 [string]$PlaceholderText = "",
-                [switch]$Required,
                 [switch]$ShowMessageBox
             )
 
             $isValid = $true
             $currentValue = ""
+
+            #debug
+            If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput ("Validating [{0}] is not null and does not have placeholder [{1}]..." -f $UIElement.Name, $PlaceholderText) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
 
             # Get the current value based on control type
             if ($UIElement -is [System.Windows.Controls.TextBox]) {
@@ -775,7 +844,7 @@ Function Invoke-SCuBAConfigAppUI {
             }
 
             # Check if field is required and empty/placeholder
-            if ($Required -and ([string]::IsNullOrWhiteSpace($currentValue) -or $currentValue -eq $PlaceholderText)) {
+            if (([string]::IsNullOrWhiteSpace($currentValue) -or $currentValue -eq $PlaceholderText)) {
                 $isValid = $false
             }
             # Check regex pattern if provided and field has content
@@ -796,6 +865,9 @@ Function Invoke-SCuBAConfigAppUI {
                     $UIElement.BorderThickness = "1"
                 }
             }
+
+            #debug
+            If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput ("Element [{0}] has value: {1}. IsValid: {2}" -f $UIElement.Name, $currentValue, $isValid) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
 
             # Show error message if requested
             if (-not $isValid -and $ShowMessageBox) {
@@ -838,7 +910,13 @@ Function Invoke-SCuBAConfigAppUI {
         # UPDATE UI FUNCTIONS
         #===========================================================================
 
-        # Function to update all UI elements from data
+        <# Function to update all UI elements from the data structures:
+            $syncHash.GeneralSettings | ConvertTo-Json -Depth 5
+            $syncHash.AdvancedSettings | ConvertTo-Json -Depth 5
+            $syncHash.Exclusions | ConvertTo-Json -Depth 5
+            $syncHash.Annotations | ConvertTo-Json -Depth 5
+            $syncHash.Omissions | ConvertTo-Json -Depth 5
+        #>
         Function Update-AllUIFromData {
             <#
             .SYNOPSIS
@@ -848,6 +926,9 @@ Function Invoke-SCuBAConfigAppUI {
             #>
             # Update general settings
             Update-GeneralSettingsFromData
+
+            # update advanced settings
+            Update-AdvancedSettingsFromData
 
             # Handle Product Name CheckBox
             Update-ProductNameCheckboxFromData
@@ -894,6 +975,73 @@ Function Invoke-SCuBAConfigAppUI {
                 If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.UpdateGeneralSettingError -f $_.Exception.Message) -Source $MyInvocation.MyCommand.Name -Level "Error"}
             }
         }
+
+        # Function to update advanced settings UI from data
+        Function Update-AdvancedSettingsFromData {
+            <#
+            .SYNOPSIS
+            Updates advanced settings UI controls from data.
+            .DESCRIPTION
+            This function populates advanced settings controls with values from the AdvancedSettings data structure and enables appropriate toggle sections.
+            #>
+            if (-not $syncHash.AdvancedSettings) { return }
+
+            try {
+                # First, determine which sections need to be enabled based on imported data
+                $sectionsToEnable = @()
+                
+                if ($syncHash.UIConfigs.advancedSections) {
+                    foreach ($toggleName in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
+                        $sectionConfig = $syncHash.UIConfigs.advancedSections.$toggleName
+                        
+                        # Check if any setting from this section exists in imported data
+                        $sectionHasData = $false
+                        foreach ($fieldControlName in $sectionConfig.fields) {
+                            $settingName = $fieldControlName -replace '_TextBox$|_CheckBox$', ''
+                            if ($syncHash.AdvancedSettings.ContainsKey($settingName)) {
+                                $sectionHasData = $true
+                                break
+                            }
+                        }
+                        
+                        # Enable the toggle if this section has data
+                        if ($sectionHasData) {
+                            $sectionsToEnable += $toggleName
+                            $toggleControl = $syncHash.$toggleName
+                            if ($toggleControl -and $toggleControl -is [System.Windows.Controls.CheckBox]) {
+                                $toggleControl.IsChecked = $true
+                                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Enabled advanced section toggle: $toggleName" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                            }
+                        }
+                    }
+                }
+
+                
+
+                # Now update the actual field values
+                foreach ($settingKey in $syncHash.AdvancedSettings.Keys) {
+                    $settingValue = $syncHash.AdvancedSettings[$settingKey]
+
+                    # Skip if value is null or empty
+                    if ($null -eq $settingValue) { continue }
+
+                    # Find the corresponding XAML control using various naming patterns
+                    $control = Find-ControlBySettingName -SettingName $settingKey
+
+                    if ($control) {
+                        Set-ControlValue -Control $control -Value $settingValue -SettingKey $settingKey
+                        If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Updated advanced setting control: $settingKey = $settingValue" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                    } else {
+                        If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Could not find control for advanced setting: $settingKey" -Source $MyInvocation.MyCommand.Name -Level "Warning"}
+                    }
+                }
+            }
+            catch {
+                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Error updating advanced settings from data: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"}
+            }
+        }
+
+
 
         Function Update-ProductNameCheckboxFromData{
             <#
@@ -1982,6 +2130,8 @@ Function Invoke-SCuBAConfigAppUI {
             .DESCRIPTION
             This function generates a complete card interface with checkboxes, input fields, tabs, and buttons for configuring multiple field types within policy settings including exclusions, omissions, and annotations.
             #>
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSReviewUnusedParameter", "ProductName")]
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSReviewUnusedParameter", "OutputData")]
             param(
                 [string]$CardName,
                 [string]$PolicyId,
@@ -2999,6 +3149,7 @@ Function Invoke-SCuBAConfigAppUI {
             .DESCRIPTION
             This function generates a reusable selection dialog with a searchable data grid, supporting single or multiple selection modes for various data types.
             #>
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSReviewUnusedParameter", "SearchProperty")]
             param(
                 [Parameter(Mandatory)]
                 [string]$Title,
@@ -3243,8 +3394,7 @@ Function Invoke-SCuBAConfigAppUI {
         # YAML CONTROL
         #======================================================
         # Function to import YAML data into core data structures (without UI updates)
-        # Updated Import-YamlToDataStructures Function
-        Function Import-YamlToDataStructures {
+                Function Import-YamlToDataStructures {
             <#
             .SYNOPSIS
             Imports YAML configuration data into internal data structures.
@@ -3254,22 +3404,48 @@ Function Invoke-SCuBAConfigAppUI {
             param($Config)
 
             try {
+                # Initialize AdvancedSettings if not exists
+                if (-not $syncHash.AdvancedSettings) {
+                    $syncHash.AdvancedSettings = @{}
+                }
+
                 # Get top-level keys (now always hashtable)
                 $topLevelKeys = $Config.Keys
 
                 #get all products from UIConfigs
                 $productIds = $syncHash.UIConfigs.products | Select-Object -ExpandProperty id
 
-                # Import General Settings that are not product
-                $generalSettingsFields = $topLevelKeys | Where-Object {$_ -notin $productIds}
+                # Import General Settings that are not product-specific
+                $generalSettingsFields = $topLevelKeys | Where-Object {$_ -notin $productIds -and $_ -notin @("OmitPolicy", "AnnotatePolicy")}
+
+                # Separate general settings from advanced settings
+                $advancedSettingsList = @()
+                if ($syncHash.UIConfigs.advancedSections) {
+                    # Get all advanced settings field names from all sections
+                    foreach ($sectionKey in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
+                        $sectionConfig = $syncHash.UIConfigs.advancedSections.$sectionKey
+                        foreach ($fieldControlName in $sectionConfig.fields) {
+                            $settingName = $fieldControlName -replace '_TextBox$|_CheckBox$', ''
+                            $advancedSettingsList += $settingName
+                        }
+                    }
+                }
 
                 foreach ($field in $generalSettingsFields) {
                     # Special handling for ProductNames to expand '*' wildcard
                     if ($field -eq "ProductNames" -and $Config[$field] -contains "*") {
                         # Expand '*' to all available products
                         $syncHash.GeneralSettings[$field] = $productIds
-                    } else {
+                        Write-DebugOutput -Message "Imported general setting (expanded wildcard): $field = $($productIds -join ', ')" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                    } 
+                    # Check if this field belongs to advanced settings
+                    elseif ($field -in $advancedSettingsList) {
+                        $syncHash.AdvancedSettings[$field] = $Config[$field]
+                        Write-DebugOutput -Message "Imported advanced setting: $field = $($Config[$field])" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                    } 
+                    else {
                         $syncHash.GeneralSettings[$field] = $Config[$field]
+                        Write-DebugOutput -Message "Imported general setting: $field = $($Config[$field])" -Source $MyInvocation.MyCommand.Name -Level "Info"
                     }
                 }
 
@@ -3304,9 +3480,7 @@ Function Invoke-SCuBAConfigAppUI {
                                             $syncHash.Exclusions[$productName][$policyId] = @{}
                                         }
 
-                                        # CORRECTED: Extract the field data from inside the exclusionField
-                                        # Instead of: $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $policyData
-                                        # We want: $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $policyData[$yamlKeyName]
+                                        # Extract the field data from inside the exclusionField
                                         $FieldListData = $policyData[$yamlKeyName]
                                         $syncHash.Exclusions[$productName][$policyId][$yamlKeyName] = $FieldListData
 
@@ -3318,7 +3492,7 @@ Function Invoke-SCuBAConfigAppUI {
                     }
                 }
 
-                # Import Omissions - Now using hashtable structure
+                # Import Omissions - FIXED structure to match save functions
                 if ($topLevelKeys -contains "OmitPolicy") {
                     $omissionKeys = $Config["OmitPolicy"].Keys
 
@@ -3336,22 +3510,28 @@ Function Invoke-SCuBAConfigAppUI {
                         }
 
                         if ($productName) {
-                            # Store as hashtable: $syncHash.Omissions[$productName][$policyId] = @{data}
+                            # Initialize product level if not exists
                             if (-not $syncHash.Omissions[$productName]) {
                                 $syncHash.Omissions[$productName] = @{}
                             }
 
-                            $syncHash.Omissions[$productName][$policyId] = @{
-                                Id = $policyId
-                                Product = $productName
+                            # Initialize policy level if not exists
+                            if (-not $syncHash.Omissions[$productName][$policyId]) {
+                                $syncHash.Omissions[$productName][$policyId] = @{}
+                            }
+
+                            # Store using the structure expected by save functions: Product -> PolicyId -> "Omit" -> Field data
+                            $syncHash.Omissions[$productName][$policyId]["Omit"] = @{
                                 Rationale = $omissionData["Rationale"]
                                 Expiration = $omissionData["Expiration"]
                             }
+
+                            Write-DebugOutput -Message "Imported omission for [$productName][$policyId]: Rationale=$($omissionData['Rationale']), Expiration=$($omissionData['Expiration'])" -Source $MyInvocation.MyCommand.Name -Level "Info"
                         }
                     }
                 }
 
-                # Import Annotations - Now using hashtable structure
+                # Import Annotations - FIXED structure to match save functions  
                 if ($topLevelKeys -contains "AnnotatePolicy") {
                     $annotationKeys = $Config["AnnotatePolicy"].Keys
 
@@ -3369,16 +3549,22 @@ Function Invoke-SCuBAConfigAppUI {
                         }
 
                         if ($productName) {
-                            # Store as hashtable: $syncHash.Annotations[$productName][$policyId] = @{data}
+                            # Initialize product level if not exists
                             if (-not $syncHash.Annotations[$productName]) {
                                 $syncHash.Annotations[$productName] = @{}
                             }
 
-                            $syncHash.Annotations[$productName][$policyId] = @{
-                                Id = $policyId
-                                Product = $productName
+                            # Initialize policy level if not exists  
+                            if (-not $syncHash.Annotations[$productName][$policyId]) {
+                                $syncHash.Annotations[$productName][$policyId] = @{}
+                            }
+
+                            # Store using the structure expected by save functions: Product -> PolicyId -> "Annotate" -> Field data
+                            $syncHash.Annotations[$productName][$policyId]["Annotate"] = @{
                                 Comment = $annotationData["Comment"]
                             }
+
+                            Write-DebugOutput -Message "Imported annotation for [$productName][$policyId]: Comment=$($annotationData['Comment'])" -Source $MyInvocation.MyCommand.Name -Level "Info"
                         }
                     }
                 }
@@ -3389,6 +3575,24 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
+        <#
+        Function New-DynamicYamlSections {
+            foreach ($baselineControl in $syncHash.UIConfigs.baselineControls) {
+                $dataHashtable = $syncHash.($baselineControl.dataControlOutput)
+
+                if ($dataHashtable -and $dataHashtable.Keys.Count -gt 0) {
+                    $yamlPreview += "`n`n$($baselineControl.yamlValue):"
+
+                    # Generate content based on the data structure
+                    foreach ($productName in $dataHashtable.Keys) {
+                        foreach ($policyId in $dataHashtable[$productName].Keys) {
+                            # Dynamic YAML generation logic here
+                        }
+                    }
+                }
+            }
+        }
+        #>
         Function New-YamlPreview {
             <#
             .SYNOPSIS
@@ -3401,26 +3605,52 @@ Function Invoke-SCuBAConfigAppUI {
             $yamlPreview += "`n# Generated on: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
             $yamlPreview += "`n`n# Organization Configuration"
 
-            # Process main settings in order of localePlaceholder keys
-            if ($syncHash.UIConfigs.localePlaceholder) {
-                foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
-                    $control = $syncHash.$placeholderKey
-                    if ($control -is [System.Windows.Controls.TextBox]) {
-                        $currentValue = $control.Text
-                        $placeholderValue = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
-
-                        # Only include if it's not empty and not a placeholder
-                        if (![string]::IsNullOrWhiteSpace($currentValue) -and $currentValue -ne $placeholderValue) {
-                            # Convert control name to YAML field name (remove _TextBox suffix)
-                            $yamlFieldName = $placeholderKey -replace '_TextBox$', ''
-                            $trimmedValue = $currentValue.Trim()
-
-                            # Handle special formatting for description
-                            if ($yamlFieldName -eq 'Description') {
-                                $escapedDescription = $trimmedValue.Replace('"', '""')
-                                $yamlPreview += "`n$yamlFieldName`: `"$escapedDescription`""
+            # Process main settings from GeneralSettings data structure instead of UI controls
+            if ($syncHash.GeneralSettings -and $syncHash.GeneralSettings.Count -gt 0) {
+                # Process in order of localePlaceholder keys for consistent output
+                if ($syncHash.UIConfigs.localePlaceholder) {
+                    foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
+                        # Convert control name to setting name (remove _TextBox suffix)
+                        $settingName = $placeholderKey -replace '_TextBox$', ''
+                        
+                        if ($syncHash.GeneralSettings.ContainsKey($settingName)) {
+                            $settingValue = $syncHash.GeneralSettings[$settingName]
+                            
+                            if (![string]::IsNullOrWhiteSpace($settingValue)) {
+                                # Handle special formatting for description
+                                if ($settingName -eq 'Description') {
+                                    $escapedDescription = $settingValue.Replace('"', '""')
+                                    $yamlPreview += "`n$settingName`: `"$escapedDescription`""
+                                } else {
+                                    $yamlPreview += "`n$settingName`: $settingValue"
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                # Add any other general settings not in localePlaceholder
+                foreach ($settingKey in $syncHash.GeneralSettings.Keys) {
+                    # Skip if already processed above
+                    $alreadyProcessed = $false
+                    if ($syncHash.UIConfigs.localePlaceholder) {
+                        foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
+                            $placeholderSettingName = $placeholderKey -replace '_TextBox$', ''
+                            if ($settingKey -eq $placeholderSettingName) {
+                                $alreadyProcessed = $true
+                                break
+                            }
+                        }
+                    }
+                    
+                    #exclude specific keys that are handled separately
+                    if (-not $alreadyProcessed -and $settingKey -ne "ProductNames" -and $settingKey -ne "M365Environment") {
+                        $settingValue = $syncHash.GeneralSettings[$settingKey]
+                        if (![string]::IsNullOrWhiteSpace($settingValue)) {
+                            if ($settingValue -is [bool]) {
+                                $yamlPreview += "`n$settingKey`: $($settingValue.ToString().ToLower())"
                             } else {
-                                $yamlPreview += "`n$yamlFieldName`: $trimmedValue"
+                                $yamlPreview += "`n$settingKey`: $settingValue"
                             }
                         }
                     }
@@ -3437,93 +3667,59 @@ Function Invoke-SCuBAConfigAppUI {
             $yamlPreview += "`n`nM365Environment: $selectedEnv"
             $yamlPreview += "`n"
 
-            # Process advanced settings in order of defaultAdvancedSettings keys
-            if ($syncHash.UIConfigs.defaultAdvancedSettings) {
-                $hasAdvancedSettings = $false
-                $advancedSettingsContent = @()
-
-                foreach ($advancedKey in $syncHash.UIConfigs.defaultAdvancedSettings.PSObject.Properties.Name) {
-                    $control = $syncHash.$advancedKey
-                    $defaultValue = $syncHash.UIConfigs.defaultAdvancedSettings.$advancedKey
-
-                    # Only include settings that are explicitly enabled by the user
-                    # Check if there's an associated checkbox to enable/disable this setting
-                    $enabledCheckBoxName = $advancedKey -replace '_TextBox$', '_EnabledCheckBox'
-                    $enabledCheckBox = $syncHash.$enabledCheckBoxName
-
-                    # If there's no enabled checkbox, check if setting has been modified from default
-                    $shouldInclude = $false
-
-                    if ($enabledCheckBox -is [System.Windows.Controls.CheckBox]) {
-                        # If there's an enabled checkbox, only include if checked
-                        $shouldInclude = $enabledCheckBox.IsChecked -eq $true
-                    } elseif ($control -is [System.Windows.Controls.TextBox]) {
-                        # If no enabled checkbox, only include if user has changed from default
-                        $currentValue = $control.Text
-                        $shouldInclude = (![string]::IsNullOrWhiteSpace($currentValue) -and
-                                        ![string]::IsNullOrWhiteSpace($defaultValue))
-                    } elseif ($control -is [System.Windows.Controls.CheckBox]) {
-                        # For checkbox controls, only include if different from default
-                        $shouldInclude = $control.IsChecked -ne $defaultValue
-                    }
-
-                    # Only process if the setting should be included
-                    if ($shouldInclude) {
-                        if ($control -is [System.Windows.Controls.TextBox]) {
-                            $currentValue = $control.Text
-
-                            # Use current value or default if empty
-                            $valueToUse = if (![string]::IsNullOrWhiteSpace($currentValue)) { $currentValue } else { $defaultValue }
-
-                            if (![string]::IsNullOrWhiteSpace($valueToUse)) {
-                                # Convert control name to YAML field name (remove _TextBox suffix)
-                                $yamlFieldName = $advancedKey -replace '_TextBox$', ''
-
-                                # Handle path escaping
-                                if ($valueToUse -match '\\') {
-                                    $advancedSettingsContent += "`n$yamlFieldName`: `"$($valueToUse.Replace('\', '\\'))`""
+            # Process advanced settings from data structure instead of UI controls
+            if ($syncHash.AdvancedSettings -and $syncHash.AdvancedSettings.Count -gt 0) {
+                $yamlPreview += "`n`n# Advanced Settings"
+                
+                # Group advanced settings by section for better organization
+                if ($syncHash.UIConfigs.advancedSections) {
+                    foreach ($toggleName in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
+                        $sectionConfig = $syncHash.UIConfigs.advancedSections.$toggleName
+                        $sectionSettings = @()
+                        
+                        # Check if any settings from this section are present
+                        foreach ($fieldControlName in $sectionConfig.fields) {
+                            $settingName = $fieldControlName -replace '_TextBox$|_CheckBox$', ''
+                            if ($syncHash.AdvancedSettings.ContainsKey($settingName)) {
+                                $settingValue = $syncHash.AdvancedSettings[$settingName]
+                                
+                                # Format the value appropriately
+                                if ($settingValue -is [bool]) {
+                                    $formattedValue = $settingValue.ToString().ToLower()
+                                } elseif ($settingValue -match '\\|:') {
+                                    $formattedValue = "`"$($settingValue.Replace('\', '\\'))`""
                                 } else {
-                                    $advancedSettingsContent += "`n$yamlFieldName`: $valueToUse"
+                                    $formattedValue = $settingValue
                                 }
-                                $hasAdvancedSettings = $true
+                                
+                                $sectionSettings += "`n$settingName`: $formattedValue"
                             }
                         }
-                        elseif ($control -is [System.Windows.Controls.CheckBox]) {
-                            # Convert control name to YAML field name (remove _CheckBox suffix)
-                            $yamlFieldName = $advancedKey -replace '_CheckBox$', ''
-                            $boolValue = if ($control.IsChecked) { "true" } else { "false" }
-                            $advancedSettingsContent += "`n$yamlFieldName`: $boolValue"
-                            $hasAdvancedSettings = $true
+                        
+                        # Add section comment and settings if any exist
+                        if ($sectionSettings.Count -gt 0) {
+                            $yamlPreview += "`n# $($sectionConfig.sectionName)"
+                            $yamlPreview += $sectionSettings
                         }
                     }
-                }
-
-                # Only add advanced settings section if there are settings to show
-                if ($hasAdvancedSettings) {
-                    $yamlPreview += "`n`n# Advanced Configuration"
-                    $yamlPreview += $advancedSettingsContent
-                    $yamlPreview += "`n"
-                }
-            }
-
-            <#
-            Function New-DynamicYamlSections {
-                foreach ($baselineControl in $syncHash.UIConfigs.baselineControls) {
-                    $dataHashtable = $syncHash.($baselineControl.dataControlOutput)
-
-                    if ($dataHashtable -and $dataHashtable.Keys.Count -gt 0) {
-                        $yamlPreview += "`n`n$($baselineControl.yamlValue):"
-
-                        # Generate content based on the data structure
-                        foreach ($productName in $dataHashtable.Keys) {
-                            foreach ($policyId in $dataHashtable[$productName].Keys) {
-                                # Dynamic YAML generation logic here
-                            }
+                } else {
+                    # Fallback: output all advanced settings without grouping
+                    foreach ($settingKey in $syncHash.AdvancedSettings.Keys) {
+                        $settingValue = $syncHash.AdvancedSettings[$settingKey]
+                        
+                        if ($settingValue -is [bool]) {
+                            $formattedValue = $settingValue.ToString().ToLower()
+                        } elseif ($settingValue -match '\\|:') {
+                            $formattedValue = "`"$($settingValue.Replace('\', '\\'))`""
+                        } else {
+                            $formattedValue = $settingValue
                         }
+                        
+                        $yamlPreview += "`n$settingKey`: $formattedValue"
                     }
                 }
             }
-            #>
+            
 
 
             # Handle Exclusions (unchanged - already hashtable)
@@ -3848,65 +4044,123 @@ Function Invoke-SCuBAConfigAppUI {
             Saves general settings from UI controls to data structures.
             .DESCRIPTION
             This function collects values from UI controls and stores them in the GeneralSettings data structure for YAML export.
+            Only processes fields that are NOT part of advanced settings sections.
             #>
 
             # Collect ProductNames from checked checkboxes - use helper function
             #Update-ProductNames
 
-            # Collect from localePlaceholder TextBox controls
-            if ($syncHash.UIConfigs.localePlaceholder)
+            # Build list of advanced settings field names to exclude
+            $advancedSettingsFields = @()
+            if ($syncHash.UIConfigs.advancedSections) {
+                foreach ($sectionKey in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
+                    $sectionConfig = $syncHash.UIConfigs.advancedSections.$sectionKey
+                    foreach ($fieldControlName in $sectionConfig.fields) {
+                        $advancedSettingsFields += $fieldControlName
+                    }
+                }
+            }
+
+            # Collect from localePlaceholder TextBox controls (EXCLUDING advanced settings)
+            if ($syncHash.UIConfigs.localePlaceholder -and $syncHash.UIConfigs.localePlaceholder.PSObject.Properties)
             {
                 foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
-                    $control = $syncHash.$placeholderKey
-                    if ($control -is [System.Windows.Controls.TextBox]) {
-                        $currentValue = $control.Text
-                        $placeholderValue = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
+                    # Skip if this control belongs to advanced settings
+                    if ($placeholderKey -in $advancedSettingsFields) {
+                        If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Skipping advanced setting: $placeholderKey" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                        continue
+                    }
 
-                        # Only include if it's not empty and not a placeholder
-                        if (![string]::IsNullOrWhiteSpace($currentValue) -and $currentValue -ne $placeholderValue) {
-                            # Convert control name to setting name (remove _TextBox suffix)
-                            $settingName = $placeholderKey -replace '_TextBox$', ''
-                            $syncHash.GeneralSettings[$settingName] = $currentValue.Trim()
+                    try {
+                        $control = $syncHash.$placeholderKey
+                        if ($control -is [System.Windows.Controls.TextBox]) {
+                            $currentValue = $control.Text
+                            $placeholderValue = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
+
+                            # Only include if it's not empty and not a placeholder
+                            if (![string]::IsNullOrWhiteSpace($currentValue) -and $currentValue -ne $placeholderValue) {
+                                # Convert control name to setting name (remove _TextBox suffix)
+                                $settingName = $placeholderKey -replace '_TextBox$', ''
+                                $syncHash.GeneralSettings[$settingName] = $currentValue.Trim()
+                                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected General setting: $placeholderKey = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                            }
                         }
                     }
-                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected Main setting: $placeholderKey = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                    catch {
+                        Write-DebugOutput -Message "Error processing placeholder key '$placeholderKey': $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Warning"
+                    }
                 }
             }
 
             # Collect M365Environment
             if ($syncHash.M365Environment_ComboBox.SelectedItem) {
-                $selectedEnv = $syncHash.UIConfigs.M365Environment | Where-Object { $_.id -eq $syncHash.M365Environment_ComboBox.SelectedItem.Tag } | Select-Object -ExpandProperty name
-                if ($selectedEnv) {
-                    $syncHash.GeneralSettings["M365Environment"] = $selectedEnv
+                try {
+                    $selectedEnv = $syncHash.UIConfigs.M365Environment | Where-Object { $_.id -eq $syncHash.M365Environment_ComboBox.SelectedItem.Tag } | Select-Object -ExpandProperty name
+                    if ($selectedEnv) {
+                        $syncHash.GeneralSettings["M365Environment"] = $selectedEnv
+                    }
+                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected M365Environment: $selectedEnv" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                 }
-                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected M365Environment: $selectedEnv" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
-            }
-
-            # Collect from advanced settings
-            if ($syncHash.UIConfigs.defaultAdvancedSettings) {
-                foreach ($advancedKey in $syncHash.UIConfigs.defaultAdvancedSettings.PSObject.Properties.Name) {
-                    $control = $syncHash.$advancedKey
-
-                    if ($control -is [System.Windows.Controls.TextBox]) {
-                        $currentValue = $control.Text
-                        if (![string]::IsNullOrWhiteSpace($currentValue)) {
-                            # Convert control name to setting name (remove _TextBox suffix)
-                            $settingName = $advancedKey -replace '_TextBox$', ''
-                            $syncHash.GeneralSettings[$settingName] = $currentValue.Trim()
-                        }
-                    }
-                    elseif ($control -is [System.Windows.Controls.CheckBox]) {
-                        # Convert control name to setting name (remove _CheckBox suffix)
-                        $settingName = $advancedKey -replace '_CheckBox$', ''
-                        $syncHash.GeneralSettings[$settingName] = $control.IsChecked
-                    }
-                    If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected Advanced setting: $settingName = $($syncHash.GeneralSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                catch {
+                    Write-DebugOutput -Message "Error processing M365Environment: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Warning"
                 }
             }
 
             # Mark data as changed
             Set-DataChanged
         } #end function : Save-GeneralSettingsFromInput
+
+        Function Save-AdvancedSettingsFromInput {
+            <#
+            .SYNOPSIS
+            Saves advanced settings from UI controls to data structures.
+            .DESCRIPTION
+            This function collects values from advanced settings UI controls and stores them in the AdvancedSettings data structure for YAML export.
+            Only collects values from sections that are enabled via their toggle checkboxes.
+            #>
+
+            # Clear advanced settings first
+            $syncHash.AdvancedSettings.Clear()
+
+            # Process each advanced section based on toggle state
+            if ($syncHash.UIConfigs.advancedSections) {
+                foreach ($toggleName in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
+                    try {
+                        $toggleControl = $syncHash.$toggleName
+                        $sectionConfig = $syncHash.UIConfigs.advancedSections.$toggleName
+                        
+                        # Only process if toggle is checked
+                        if ($toggleControl -and $toggleControl.IsChecked) {
+                            foreach ($fieldControlName in $sectionConfig.fields) {
+                                $control = $syncHash.$fieldControlName
+                                
+                                if ($control -is [System.Windows.Controls.TextBox]) {
+                                    $currentValue = $control.Text
+                                    if (![string]::IsNullOrWhiteSpace($currentValue)) {
+                                        # Convert control name to setting name (remove _TextBox suffix)
+                                        $settingName = $fieldControlName -replace '_TextBox$', ''
+                                        $syncHash.AdvancedSettings[$settingName] = $currentValue.Trim()
+                                    }
+                                }
+                                elseif ($control -is [System.Windows.Controls.CheckBox]) {
+                                    # Convert control name to setting name (remove _CheckBox suffix)
+                                    $settingName = $fieldControlName -replace '_CheckBox$', ''
+                                    $syncHash.AdvancedSettings[$settingName] = $control.IsChecked
+                                }
+                                If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message "Collected Advanced setting: $settingName = $($syncHash.AdvancedSettings[$settingName])" -Source $MyInvocation.MyCommand.Name -Level "Debug"}
+                            }
+                        }
+                    }
+                    catch {
+                        Write-DebugOutput -Message "Error processing advanced section '$toggleName': $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Warning"
+                    }
+                }
+            }
+
+            # Mark data as changed
+            Set-DataChanged
+        } #end function : Save-AdvancedSettingsFromInput
+
         #===========================================================================
         # Make UI functional
         #===========================================================================
@@ -4317,6 +4571,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $syncHash.Omissions = @{}
                     $syncHash.Annotations = @{}
                     $syncHash.GeneralSettings = @{}
+                    $syncHash.AdvancedSettings = @{}
 
                     # Import data into the core data structures
                     Import-YamlToDataStructures -Config $yamlHash
@@ -4336,19 +4591,16 @@ Function Invoke-SCuBAConfigAppUI {
         $syncHash.PreviewButton.Add_Click({
 
             $syncHash.Window.Dispatcher.Invoke([action]{
-                $overallValid = $true
                 $errorMessages = @()
 
                 # Organization validation (required)
-                $orgValid = Confirm-UIField -UIElement $syncHash.Organization_TextBox `
+                $orgValid = Confirm-RequiredField -UIElement $syncHash.Organization_TextBox `
                                         -RegexPattern $syncHash.UIConfigs.valueValidations.tenantDomain.pattern `
                                         -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.OrganizationValidation `
                                         -PlaceholderText $syncHash.UIConfigs.localePlaceholder.Organization_TextBox `
-                                        -Required `
                                         -ShowMessageBox:$false
 
                 if (-not $orgValid) {
-                    $overallValid = $false
                     $errorMessages += $syncHash.UIConfigs.localeErrorMessages.OrganizationValidation
                     #navigate to General tab
                     $syncHash.MainTabControl.SelectedItem = $syncHash.MainTab
@@ -4360,34 +4612,74 @@ Function Invoke-SCuBAConfigAppUI {
                 if ($syncHash.ApplicationSection_Toggle.IsChecked) {
 
                     # AppID validation (GUID format)
-                    $appIdValid = Confirm-UIField -UIElement $syncHash.AppId_TextBox `
+                    $appIdValid = Confirm-RequiredField -UIElement $syncHash.AppId_TextBox `
                                                     -RegexPattern $syncHash.UIConfigs.valueValidations.guid.pattern `
                                                     -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.AppIdValidation `
                                                     -PlaceholderText $syncHash.UIConfigs.localePlaceholder.AppId_TextBox `
                                                     -ShowMessageBox:$false
 
                     if (-not $appIdValid) {
-                        $overallValid = $false
                         $errorMessages += $syncHash.UIConfigs.localeErrorMessages.AppIdValidation
                         $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
                     }
 
                     # Certificate Thumbprint validation (40 character hex)
-                    $certValid = Confirm-UIField -UIElement $syncHash.CertificateThumbprint_TextBox `
-                                                -RegexPattern $syncHash.UIConfigs.valueValidations.thumbprint.pattern `
-                                                -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.CertificateValidation `
-                                                -PlaceholderText $syncHash.UIConfigs.localePlaceholder.CertificateThumbprint_TextBox `
-                                                -ShowMessageBox:$false
+                    $certValid = Confirm-RequiredField -UIElement $syncHash.CertificateThumbprint_TextBox `
+                                                    -RegexPattern $syncHash.UIConfigs.valueValidations.thumbprint.pattern `
+                                                    -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.CertificateValidation `
+                                                    -PlaceholderText $syncHash.UIConfigs.localePlaceholder.CertificateThumbprint_TextBox `
+                                                    -ShowMessageBox:$false
 
                     if (-not $certValid) {
-                        $overallValid = $false
                         $errorMessages += $syncHash.UIConfigs.localeErrorMessages.CertificateValidation
                         $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
                     }
                 }
 
+                # OPA Section Validations
+                if ($syncHash.OpaSection_Toggle.IsChecked) {
+
+                    # OPA Path validation using Confirm-RequiredField
+                    $opaPathValid = Confirm-RequiredField -UIElement $syncHash.OpaPath_TextBox `
+                                                    -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.OpaPathRequired `
+                                                    -PlaceholderText $syncHash.UIConfigs.localePlaceholder.OpaPath_TextBox `
+                                                    -ShowMessageBox:$false
+
+                    if (-not $opaPathValid) {
+                        $errorMessages += $syncHash.UIConfigs.localeErrorMessages.OpaPathRequired
+                        $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
+                    } else {
+                        # Additional validation for executable existence (only if basic validation passed)
+                        $opaPath = $syncHash.OpaPath_TextBox.Text.Trim()
+                        $opaValid = $false
+                        $opaErrorMessage = ""
+
+                        # Check if path exists
+                        if (Test-Path $opaPath) {
+                            # Check for opa_windows_amd64.exe or opa.exe in the specified path
+                            $opaExe1 = Join-Path $opaPath "opa_windows_amd64.exe"
+                            $opaExe2 = Join-Path $opaPath "opa.exe"
+
+                            if (Test-Path $opaExe1) {
+                                $opaValid = $true
+                            } elseif (Test-Path $opaExe2) {
+                                $opaValid = $true
+                            } else {
+                                $opaErrorMessage = ($syncHash.UIConfigs.localeErrorMessages.OpaPathValidation -f $opaPath)
+                            }
+                        } else {
+                            $opaErrorMessage = ($syncHash.UIConfigs.localeErrorMessages.OpaFileNotExist -f $opaPath)
+                        }
+
+                        if (-not $opaValid) {
+                            $errorMessages += $opaErrorMessage
+                            $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
+                        }
+                    }
+                }
+
                 # Show consolidated error message if there are validation errors
-                if (-not $overallValid) {
+                if ($errorMessages.Count -gt 0) {
                     $syncHash.PreviewTab.IsEnabled = $false
                     $consolidatedMessage = $syncHash.UIConfigs.localeErrorMessages.PreviewValidation + "`n`n" + ($errorMessages -join "`n")
                     [System.Windows.MessageBox]::Show($consolidatedMessage, "Validation Errors", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
@@ -4395,7 +4687,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $syncHash.PreviewTab.IsEnabled = $true
                 }
 
-                if ($overallValid) {
+                if ($errorMessages.Count -eq 0) {
                     New-YamlPreview
                 }
             }) #end Dispatcher.Invoke
@@ -4407,16 +4699,16 @@ Function Invoke-SCuBAConfigAppUI {
                 $syncHash.Window.Dispatcher.Invoke([Action]{
                     if (![string]::IsNullOrWhiteSpace($syncHash.YamlPreview_TextBox.Text)) {
                         [System.Windows.Clipboard]::SetText($syncHash.YamlPreview_TextBox.Text)
-                        [System.Windows.MessageBox]::Show("YAML preview copied to clipboard successfully.", "Copy Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.YamlClipboardComplete, "Copy Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                     } else {
-                        [System.Windows.MessageBox]::Show("No YAML preview to copy.", "Nothing to Copy", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.YamlClipboardNoPreview, "Nothing to Copy", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                     }
                 })
             }
             catch {
                 # Even this must go in Dispatcher
                 $syncHash.Window.Dispatcher.Invoke([Action]{
-                    [System.Windows.MessageBox]::Show("Error copying YAML preview to clipboard: $($_.Exception.Message)", "Copy Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+                    [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.YamlClipboardError -f $_.Exception.Message, "Copy Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
                 })
             }
         })
@@ -4432,7 +4724,8 @@ Function Invoke-SCuBAConfigAppUI {
                 # Generate filename based on organization name
                 $orgName = $syncHash.Organization_TextBox.Text
                 if ([string]::IsNullOrWhiteSpace($orgName) -or $orgName -eq $syncHash.UIConfigs.localePlaceholder.Organization_TextBox) {
-                    $filename = "ScubaGear-Config.yaml"
+                    $dateFormat = (Get-Date).ToString("yyyy-MM-dd_HH-mm-ss")
+                    $filename = "ScubaGear-Config-$dateFormat.yaml"
                 } else {
                     # Remove any invalid filename characters and use organization name
                     $cleanOrgName = $orgName -replace '[\\/:*?"<>|]', '_'
@@ -4450,16 +4743,32 @@ Function Invoke-SCuBAConfigAppUI {
                     # Save the YAML content to file
                     $yamlContent = $syncHash.YamlPreview_TextBox.Text
                     [System.IO.File]::WriteAllText($saveFileDialog.FileName, $yamlContent, [System.Text.Encoding]::UTF8)
+
                     #$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
                     #[System.IO.File]::WriteAllText($saveFileDialog.FileName, $yamlContent, $utf8NoBom)
                     #$yamlContent | Out-File -FilePath $saveFileDialog.FileName -Encoding utf8NoBOM
 
-                    [System.Windows.MessageBox]::Show("Configuration saved successfully to: $($saveFileDialog.FileName)", "Save Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                    [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.localePopupMessages.YamlSaveSuccess -f $saveFileDialog.FileName), "Save Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                 }
             }
             catch {
-                [System.Windows.MessageBox]::Show("Error saving file: $($_.Exception.Message)", "Save Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+                [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.localePopupMessages.YamlSaveError -f $_.Exception.Message), "Save Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
             }
+        })
+
+        $synchash.DownloadDebugLogButton.Add_Click({
+            if ($syncHash.DebugLog -and $syncHash.DebugLog.Count -gt 0) {
+                $saveDialog = New-Object Microsoft.Win32.SaveFileDialog
+                $saveDialog.Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*"
+                $saveDialog.DefaultExt = "txt"
+                $saveDialog.FileName = "ScubaGear_Debug_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
+
+                if ($saveDialog.ShowDialog() -eq $true) {
+                    $syncHash.DebugLog | Out-File -FilePath $saveDialog.FileName -Encoding UTF8
+                    [System.Windows.MessageBox]::Show("Debug log saved to: $($saveDialog.FileName)", "Debug Log Saved", "OK", "Information")
+                }
+            }
+
         })
 
         # Browse Output Path Button
@@ -4509,12 +4818,12 @@ Function Invoke-SCuBAConfigAppUI {
                     } | Sort-Object Subject
                 }
                 catch {
-                    Write-DebugOutput -Message "Error accessing certificate store: $($_.Exception.Message)" -Source "Certificate Selection" -Level "Error"
-                    [System.Windows.MessageBox]::Show("Error accessing certificate store: $($_.Exception.Message)", "Certificate Store Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+                    Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.CertificateStoreAccessError -f $_.Exception.Message) -Source "Certificate Selection" -Level "Error"
+                    [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.localeErrorMessages.CertificateStoreAccessError -f $_.Exception.Message), "Certificate Store Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
                     return
                 }
 
-                Write-DebugOutput -Message "Found $($userCerts.Count) certificates" -Source "Certificate Selection" -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.localeVerboseMessages.CertificateFound -f $userCerts.Count) -Source "Certificate Selection" -Level "Verbose"
 
                 if ($userCerts.Count -eq 0) {
                     [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localeErrorMessages.CertificateNotFound,
@@ -4555,10 +4864,10 @@ Function Invoke-SCuBAConfigAppUI {
                                     -ReturnProperty "Thumbprint"
 
                 $syncHash.CertificateThumbprint_TextBox.Text = $selectedThumbprint
-                Write-DebugOutput -Message "Selected certificate thumbprint: $selectedThumbprint" -Source "Certificate Selection" -Level "Info"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.localeInfoMessages.SelectedCertificateThumbprint -f $selectedThumbprint) -Source "Certificate Selection" -Level "Info"
             }
             catch {
-                Write-DebugOutput -Message "Certificate selection error: $($_.Exception.Message)" -Source "Certificate Selection" -Level "Error"
+                Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.CertificateSelectionError -f $_.Exception.Message) -Source "Certificate Selection" -Level "Error"
                 [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localeErrorMessages.WindowError,
                                                 "Error",
                                                 [System.Windows.MessageBoxButton]::OK,
@@ -4573,16 +4882,16 @@ Function Invoke-SCuBAConfigAppUI {
                 $syncHash.Window.Dispatcher.Invoke([Action]{
                     if (![string]::IsNullOrWhiteSpace($syncHash.Debug_TextBox.Text)) {
                         [System.Windows.Clipboard]::SetText($syncHash.Debug_TextBox.Text)
-                        [System.Windows.MessageBox]::Show("Debug logs copied to clipboard successfully.", "Copy Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.DebugLogsCopied, "Copy Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                     } else {
-                        [System.Windows.MessageBox]::Show("No debug logs to copy.", "Nothing to Copy", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.DebugLogsNoEntries, "Nothing to Copy", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
                     }
                 })
             }
             catch {
                 # Even this must go in Dispatcher
                 $syncHash.Window.Dispatcher.Invoke([Action]{
-                    [System.Windows.MessageBox]::Show("Error copying debug logs to clipboard: $($_.Exception.Message)", "Copy Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+                    [System.Windows.MessageBox]::Show(($syncHash.UIConfigs.localePopupMessages.DebugLogsError -f $_.Exception.Message), "Copy Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
                 })
             }
         })
@@ -4594,7 +4903,6 @@ Function Invoke-SCuBAConfigAppUI {
         $syncHash.Window.Add_Loaded({ $syncHash.isLoaded = $True })
     	$syncHash.Window.Add_Loaded({
             $syncHash.isLoaded = $true
-            Write-Host "Window loaded successfully" -ForegroundColor Green
         })
 
         # Closing event - called when user closes window or Close() is called

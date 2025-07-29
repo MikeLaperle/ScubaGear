@@ -6,9 +6,45 @@
     Width="1200"
     WindowStartupLocation="CenterScreen"
     Background="#F6FBFE"
+    ShowInTaskbar="False"
     >
 
     <Window.Resources>
+        <!-- ScubaGear Icon as DrawingImage -->
+        <DrawingImage x:Key="ScubaGearIconImage">
+            <DrawingImage.Drawing>
+                <DrawingGroup>
+                    <!-- Background -->
+                    <GeometryDrawing>
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="0,0,48,48" RadiusX="12" RadiusY="12"/>
+                        </GeometryDrawing.Geometry>
+                        <GeometryDrawing.Brush>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                <GradientStop Color="#2A4365" Offset="0"/>
+                                <GradientStop Color="#319795" Offset="1"/>
+                            </LinearGradientBrush>
+                        </GeometryDrawing.Brush>
+                    </GeometryDrawing>
+                    
+                    <!-- Shield -->
+                    <GeometryDrawing>
+                        <GeometryDrawing.Geometry>
+                            <PathGeometry Figures="M24,10.5 L13.5,13.5 L13.5,24 Q13.5,29 24,37.5 Q34.5,29 34.5,24 L34.5,13.5 Z"/>
+                        </GeometryDrawing.Geometry>
+                        <GeometryDrawing.Brush>
+                            <SolidColorBrush Color="#4DFFFFFF"/>
+                        </GeometryDrawing.Brush>
+                        <GeometryDrawing.Pen>
+                            <Pen Brush="White" Thickness="1.5"/>
+                        </GeometryDrawing.Pen>
+                    </GeometryDrawing>
+                    
+                    <!-- Wave lines and S-curve would go here -->
+                </DrawingGroup>
+            </DrawingImage.Drawing>
+        </DrawingImage>
+
         <!-- Colors from the ScubaGear theme -->
         <SolidColorBrush x:Key="PrimaryBrush" Color="#3D5B96"/>
         <!-- Deep blue -->
@@ -488,16 +524,25 @@
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,16">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" Orientation="Vertical">
+            <!-- Logo Icon -->
+            <Image Grid.Column="0" 
+                   Source="{StaticResource ScubaGearIconImage}" 
+                   Width="48" 
+                   Height="48" 
+                   Margin="0,0,16,0" 
+                   VerticalAlignment="Top"/>
+
+            <StackPanel Grid.Column="1" Orientation="Vertical">
                 <TextBlock x:Name="Title_TextBlock" FontSize="22" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
                 <TextBlock x:Name="SubTitle_TextBlock" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,0"/>
             </StackPanel>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="NewSessionButton" Style="{StaticResource SecondaryButton}" Content="New Session" Margin="0,0,8,0" Width="96"/>
                 <Button x:Name="ImportButton" Style="{StaticResource SecondaryButton}" Content="Import" Margin="0,0,8,0" Width="70"/>
                 <Button x:Name="PreviewButton" Style="{StaticResource PrimaryButton}" Content="Preview &amp; Generate" Width="141"/>
@@ -1047,10 +1092,14 @@
                                          VerticalContentAlignment="Top" />
 
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                                        <Button x:Name="CopyDebugLogsButton"
+                                        <Button x:Name="DownloadDebugLogButton"
                                             Style="{StaticResource SecondaryButton}"
+                                            Content="Download Debug Log" Height="37" Width="150" Margin="0,0,8,0" />
+                                        <Button x:Name="CopyDebugLogsButton"
+                                            Style="{StaticResource PrimaryButton}"
                                             Content="Copy to Clipboard"
-                                            Margin="0,0,8,0" Width="116" Height="37"/>
+                                            Width="116" Height="37"/>
+                                        
                                     </StackPanel>
                                 </StackPanel>
                             </Border>

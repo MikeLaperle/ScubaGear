@@ -1,5 +1,5 @@
 {
-  "DebugMode": "None",
+  "DebugMode": "Debug",
   "Version": "1.12.0",
   "localeContext": {
     "Title_TextBlock": "Scuba Configuration Editor",
@@ -25,22 +25,27 @@
     "CollectedArrayField": "Collected array field [{0}][{1}]: {2}",
     "CollectedBooleanField": "Collected boolean field [{0}][{1}]: {2}",
     "CollectedStringField": "Collected string field [{0}][{1}]: {2}",
-    "MergedCardField": "{0} merged for [{1}][{2}][{3}]: {4}"
+    "MergedCardField": "{0} merged for [{1}][{2}][{3}]: {4}",
+    "SelectedCertificateThumbprint": "Selected certificate thumbprint: {0}"
   },
   "localeVerboseMessages": {
-      "NewFieldCardSearch": "Looking for field: {0} (type: {1})",
-      "ControlFieldProcessing": "Processing {0} Field: {1}",
-      "ControlFieldCardSearch": "Looking for control: {0} (type: {1})",
-      "DynamicPlaceholders": "Dynamic placeholders for validation: {0}",
-      "RequiredFieldCheck": "Checking required field: {0}(control: {1})",
-      "RequiredFieldHasValue": "Required field has value: {0}"
+    "NewFieldCardSearch": "Looking for field: {0} (type: {1})",
+    "ControlFieldProcessing": "Processing {0} Field: {1}",
+    "ControlFieldCardSearch": "Looking for control: {0} (type: {1})",
+    "DynamicPlaceholders": "Dynamic placeholders for validation: {0}",
+    "RequiredFieldCheck": "Checking required field: {0}(control: {1})",
+    "RequiredFieldHasValue": "Required field has value: {0}",
+    "CertificateFound": "Found {0} certificates"
   },
   "localeErrorMessages": {
     "CertificateNotFound": "No suitable certificates found in the current user's personal certificate store.",
-    "WindowError": "Error loading",
+    "WindowError": "Error loading screen",
     "OrganizationValidation" : "Organization Name is required and must be in format: example.onmicrosoft.com or example.onmicrosoft.us",
     "AppIdValidation": "Application ID must be in GUID format (e.g., 12345678-1234-1234-1234-123456789abc)",
     "CertificateValidation": "Certificate Thumbprint must be 40 hexadecimal characters",
+    "CertificateStoreAccessError": "Error accessing certificate store: {0}",
+    "OpaPathValidation": "OPA executable not found. Please ensure 'opa_windows_amd64.exe' or 'opa.exe' exists in the specified path: {0}",
+    "OpaFileNotExist": "OPA path does not exist: {0}",
     "PreviewValidation": "Please review all fields for errors before proceeding.",
     "CopyError": "No YAML content to copy. Please generate the configuration first.",
     "DownloadNullError": "No YAML content to download. Please generate the configuration first",
@@ -63,12 +68,10 @@
     "RequiredFieldMissing": "Required field missing: {0}",
     "SkippingNullCard": "Skipping null card for policy: {0}",
     "NoBaselineControlConfigFound": "No baseline control configuration found for: {0}",
-    "RemoveEventHandlerError" : "Failed to remove event handler for: {0}"
+    "RemoveEventHandlerError" : "Failed to remove event handler for: {0}",
+    "CertificateSelectionError": "Certificate selection error: {0}"
   },
   "localeDebugOutput":{
-    "UIInitializationInfo": "UI initialization started - creating timer and data structures",
-    "UITimerDebug" : "Data changes detected - updating UI displays",
-    "UITimerError" : "Error in UI update timer {0}",
     "ControlEventAdd" : "Adding event handlers for {0}: {1}",
     "ControlEventSelect" : "User changed a {0} named [{1}] value to: {2}",
     "SetControlWarning" : "Setting warning for {0}: {1}",
@@ -105,7 +108,15 @@
     "CardSavedSuccess": "[{0}] {1} saved successfully for: {2}",
     "NoEntriesFound" : "No {0} entries entered. Please fill in at least one field in any of the available {0} fields.",
     "RemoveCardPolicyConfirmation" : "Are you sure you want to remove all {0} for [{1}]?",
-    "RemoveCardEntrySuccess" : "[{0}] {1} removed successfully."
+    "RemoveCardEntrySuccess" : "[{0}] {1} removed successfully.",
+    "YamlClipboardComplete": "YAML preview copied to clipboard successfully.",
+    "YamlClipboardNoPreview": "No YAML preview to copy.",
+    "YamlClipboardError": "Error copying YAML preview to clipboard: {0}",
+    "YamlSaveSuccess": "Configuration saved successfully to: {0}",
+    "YamlSaveError": "Error saving configuration to YAML: {0}",
+    "DebugLogsCopied": "Debug logs copied to clipboard successfully.",
+    "DebugLogsNoEntries": "No debug logs to copy.",
+    "DebugLogsError": "Error copying debug logs to clipboard: {0}"
   },
   "defaultAdvancedSettings": {
     "OutPath_TextBox" : ".",
@@ -120,6 +131,24 @@
     "OpaPath_TextBox" : ".",
     "LogIn_CheckBox" : true,
     "DisconnectOnExit_CheckBox" : false
+  },
+  "advancedSections": {
+    "ApplicationSection_Toggle": {
+      "sectionName": "Application Authentication",
+      "fields": ["AppId_TextBox", "CertificateThumbprint_TextBox"]
+    },
+    "OutputSection_Toggle": {
+      "sectionName": "Output Configuration", 
+      "fields": ["OutPath_TextBox", "OutFolderName_TextBox", "OutProviderFileName_TextBox", "OutRegoFileName_TextBox", "OutReportName_TextBox", "OutJsonFileName_TextBox", "OutCsvFileName_TextBox", "OutActionPlanFileName_TextBox"]
+    },
+    "OpaSection_Toggle": {
+      "sectionName": "OPA Configuration",
+      "fields": ["OpaPath_TextBox"]
+    },
+    "GeneralSection_Toggle": {
+      "sectionName": "General Settings",
+      "fields": ["LogIn_CheckBox", "DisconnectOnExit_CheckBox"]
+    }
   },
   "products": [
     {
@@ -1592,7 +1621,7 @@
     },
     "annotation": {
       "name": "Annotation",
-      "value": "Annotate",
+      "value": "AnnotatePolicy",
       "description": "Exercise care when marking incorrect results because this can inadvertently introduce blind spots when assessing your system.",
       "fields": [
         {
@@ -1623,7 +1652,7 @@
     },
     "omissions":{
       "name": "Omissions",
-      "Value": "Omit",
+      "Value": "OmitPolicy",
       "description": "Exercise care when omitting policies because this can inadvertently introduce blind spots when assessing your system.",
       "fields": [
         {

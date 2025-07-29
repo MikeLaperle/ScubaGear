@@ -581,4 +581,4 @@ Update-ScubaConfigBaselineWithRego -ConfigFilePath ".\ScubaConfig_en-US.json" -G
 Update-ScubaConfigBaselineWithRego -ConfigFilePath ".\ScubaConfig_en-US.json" -GitHubDirectoryUrl "https://github.com/cisagov/ScubaGear/tree/main/PowerShell/ScubaGear/baselines" -RegoDirectory "..\..\Rego" -AdditionalFields @('criticality')
 #>
 # export
-Export-ModuleMember -Function Get-ScubaBaselinePolicy, Get-ScubaConfigRegoExclusionMappings, Update-ScubaConfigBaselineWithRego
+#Export-ModuleMember -Function Get-ScubaBaselinePolicy, Get-ScubaConfigRegoExclusionMappings, Update-ScubaConfigBaselineWithRego

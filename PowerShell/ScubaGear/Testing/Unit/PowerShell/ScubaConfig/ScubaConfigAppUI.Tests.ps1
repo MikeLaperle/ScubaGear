@@ -4,20 +4,21 @@ InModuleScope ScubaConfigAppUI {
 
     Describe -tag "Config" -name 'ScubaConfig JSON Configuration Validation' {
         BeforeAll {
+            [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments', 'configPath')]
             $configPath = "$PSScriptRoot\..\..\..\..\Modules\ScubaConfig\ScubaConfig_en-US.json"
         }
 
         Context 'JSON File Structure Validation' {
             It 'Should have a valid JSON configuration file' {
                 Test-Path $configPath | Should -BeTrue -Because "Configuration file should exist at expected location"
-                
+
                 { $script:configContent = Get-Content $configPath -Raw | ConvertFrom-Json } | Should -Not -Throw -Because "JSON should be valid and parseable"
                 $script:configContent | Should -Not -BeNullOrEmpty
             }
 
             It 'Should contain all required root keys' {
                 $configContent = Get-Content $configPath -Raw | ConvertFrom-Json
-                
+
                 # Define expected root keys based on your configuration structure
                 $expectedRootKeys = @(
                     'DebugMode',
@@ -60,7 +61,7 @@ InModuleScope ScubaConfigAppUI {
             It 'Should have products array with required properties' {
                 $configContent = Get-Content $configPath -Raw | ConvertFrom-Json
                 $configContent.products | Should -Not -BeNullOrEmpty
-                
+
                 # Ensure products is treated as an array (handle single item case)
                 $productsArray = @($configContent.products)
                 $productsArray.Count | Should -BeGreaterThan 0 -Because "Should have at least one product"
@@ -70,7 +71,7 @@ InModuleScope ScubaConfigAppUI {
                     $product.PSObject.Properties.Name | Should -Contain 'name' -Because "Each product should have a 'name' property"
                     $product.PSObject.Properties.Name | Should -Contain 'displayName' -Because "Each product should have a 'displayName' property"
                     $product.PSObject.Properties.Name | Should -Contain 'supportsExclusions' -Because "Each product should have a 'supportsExclusions' property"
-                    
+
                     $product.id | Should -Not -BeNullOrEmpty
                     $product.supportsExclusions | Should -BeOfType [System.Boolean]
                 }
@@ -81,7 +82,7 @@ InModuleScope ScubaConfigAppUI {
             It 'Should have M365Environment array with required properties' {
                 $configContent = Get-Content $configPath -Raw | ConvertFrom-Json
                 $configContent.M365Environment | Should -Not -BeNullOrEmpty
-                
+
                 # Ensure M365Environment is treated as an array (handle single item case)
                 $environmentsArray = @($configContent.M365Environment)
                 $environmentsArray.Count | Should -BeGreaterThan 0 -Because "Should have at least one environment"
@@ -90,7 +91,7 @@ InModuleScope ScubaConfigAppUI {
                     $env.PSObject.Properties.Name | Should -Contain 'id' -Because "Each environment should have an 'id' property"
                     $env.PSObject.Properties.Name | Should -Contain 'name' -Because "Each environment should have a 'name' property"
                     $env.PSObject.Properties.Name | Should -Contain 'displayName' -Because "Each environment should have a 'displayName' property"
-                    
+
                     $env.id | Should -Not -BeNullOrEmpty
                     $env.name | Should -Not -BeNullOrEmpty
                 }
@@ -101,7 +102,7 @@ InModuleScope ScubaConfigAppUI {
             It 'Should have baselineControls array with required properties' {
                 $configContent = Get-Content $configPath -Raw | ConvertFrom-Json
                 $configContent.baselineControls | Should -Not -BeNullOrEmpty
-                
+
                 # Ensure baselineControls is treated as an array (handle single item case)
                 $controlsArray = @($configContent.baselineControls)
                 $controlsArray.Count | Should -BeGreaterThan 0 -Because "Should have at least one baseline control"
@@ -119,9 +120,9 @@ InModuleScope ScubaConfigAppUI {
         Context 'Locale Messages Validation' {
             It 'Should have non-empty locale message sections' {
                 $configContent = Get-Content $configPath -Raw | ConvertFrom-Json
-                
+
                 $localeMessageSections = @('localeContext', 'localePlaceholder', 'localeInfoMessages', 'localeVerboseMessages', 'localeErrorMessages', 'localeDebugOutput', 'localePopupMessages')
-                
+
                 foreach ($section in $localeMessageSections) {
                     $configContent.$section | Should -Not -BeNullOrEmpty -Because "Locale section '$section' should not be empty"
                     $configContent.$section.PSObject.Properties.Count | Should -BeGreaterThan 0 -Because "Locale section '$section' should contain message definitions"
@@ -139,7 +140,7 @@ InModuleScope ScubaConfigAppUI {
                     $validationObj.PSObject.Properties.Name | Should -Contain 'pattern' -Because "Validation '$($validation.Name)' should have a 'pattern' property"
                     $validationObj.PSObject.Properties.Name | Should -Contain 'sample' -Because "Validation '$($validation.Name)' should have a 'sample' property"
                     $validationObj.PSObject.Properties.Name | Should -Contain 'format' -Because "Validation '$($validation.Name)' should have a 'format' property"
-                    
+
                     $validationObj.pattern | Should -Not -BeNullOrEmpty
                     $validationObj.sample | Should -Not -BeNullOrEmpty
                 }
@@ -157,7 +158,7 @@ InModuleScope ScubaConfigAppUI {
                     $queryObj.PSObject.Properties.Name | Should -Contain 'endpoint' -Because "Graph query '$($query.Name)' should have an 'endpoint' property"
                     $queryObj.PSObject.Properties.Name | Should -Contain 'outProperty' -Because "Graph query '$($query.Name)' should have an 'outProperty' property"
                     $queryObj.PSObject.Properties.Name | Should -Contain 'tipProperty' -Because "Graph query '$($query.Name)' should have a 'tipProperty' property"
-                    
+
                     $queryObj.endpoint | Should -Match '^/v1\.0/' -Because "Graph endpoint should start with '/v1.0/'"
                 }
             }
@@ -172,10 +173,10 @@ InModuleScope ScubaConfigAppUI {
                 $productsArray = @($configContent.products)
                 foreach ($product in $productsArray) {
                     $configContent.baselines.PSObject.Properties.Name | Should -Contain $product.id -Because "Baselines should exist for product '$($product.id)'"
-                    
+
                     $productBaselines = $configContent.baselines.($product.id)
                     $productBaselines | Should -Not -BeNullOrEmpty -Because "Product '$($product.id)' should have baseline policies"
-                    
+
                     # Ensure baselines is treated as an array (handle single item case)
                     $baselinesArray = @($productBaselines)
                     $baselinesArray.Count | Should -BeGreaterThan 0 -Because "Product '$($product.id)' should have at least one baseline policy"
@@ -183,7 +184,7 @@ InModuleScope ScubaConfigAppUI {
             }
         }
     }
-    
+
     Describe -tag "UI" -name 'ScubaConfigAppUI XAML Validation' {
         BeforeAll {
             # Mock the UI launch function to prevent actual UI from showing
