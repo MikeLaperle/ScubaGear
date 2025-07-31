@@ -23,18 +23,18 @@ Opens the ScubaGear Configuration UI for creating and managing configuration fil
 #### Syntax
 
 ```powershell
-Invoke-SCuBAConfigAppUI [[-YAMLConfigFile] <String>] [[-Language] <String>] [-Online] [[-M365Environment] <String>] [-Passthru]
+Invoke-SCuBAConfigAppUI [[-ConfigFilePath] <String>] [[-Language] <String>] [-Online] [[-M365Environment] <String>] [-Passthru]
 ```
 
 #### Parameters
 
 | Parameter | Type | Description | Default |
 |-----------|------|-------------|---------|
-| YAMLConfigFile | String | Path to existing YAML configuration file to import | None |
+| ConfigFilePath | String | Path to existing YAML configuration file to import | None |
 | Language | String | UI language (localization) | "en-US" |
 | Online | Switch | Enable Microsoft Graph connectivity | False |
 | M365Environment | String | Target M365 environment (commercial, gcc, gcchigh, dod) | "commercial" |
-| Passthru | Switch | Return the configuration object | False |
+| Passthru | Switch | Return the configuration objects | False |
 
 #### Examples
 
@@ -46,10 +46,19 @@ Invoke-SCuBAConfigAppUI
 Invoke-SCuBAConfigAppUI -Online -M365Environment commercial
 
 # Import existing configuration
-Invoke-SCuBAConfigAppUI -YAMLConfigFile "C:\configs\myconfig.yaml"
+Invoke-SCuBAConfigAppUI -ConfigFilePath "C:\configs\myconfig.yaml"
 
 # Launch and connect to graph for GCC High environment
 Invoke-SCuBAConfigAppUI -Online -M365Environment gcchigh
+
+#Use Passthru with a variable to save all configurations in hashtables
+$ScubaUI = Invoke-SCuBAConfigAppUI -Passthru
+#retrieving data
+$ScubaUI.GeneralSettings | ConvertTo-Json
+$ScubaUI.AdvancedSettings | ConvertTo-Json
+$ScubaUI.Exclusions | ConvertTo-Json -Depth 4
+$ScubaUI.Annotations | ConvertTo-Json -Depth 4
+$ScubaUI.Omissions | ConvertTo-Json -Depth 4
 ```
 
 ## Features
@@ -95,7 +104,7 @@ The configurations created by this UI are fully compatible with the main ScubaGe
 
 ```powershell
 # Use the generated configuration
-Invoke-SCuBA -ConfigFilePath "path\to\generated\domain.onmicrosoft.com.yaml"
+Invoke-SCuBA -ConfigFilePath "path\to\generated\example.onmicrosoft.com.yaml"
 ```
 
 ## Module Files
@@ -122,7 +131,7 @@ The `ScubaConfig_en-US.json` file contains:
 ```json
 {
   "DebugMode": "none", //supports: None, Info, Verbose, Debug
-  "Version": "1.10.0",
+  "Version": "1.12.0",
   "localeContext": {
     // UI text elements
   },
@@ -141,8 +150,14 @@ The `ScubaConfig_en-US.json` file contains:
   "products": {
     // defines supported product for scubagear
   },
+  "advancedSections": {
+    //defined advanced settings toggle. 
+  },
   "M365Environment": {
     //supported tenant environments for config file
+  },
+  "baselineControls": {
+    // defines the types of baseline controls to display
   },
   "baselines": [
     "aad": {
@@ -167,8 +182,11 @@ The `ScubaConfig_en-US.json` file contains:
       // defines scubagear baselines for PowerPlatform
     }
   ],
-  "exclusionTypes": {
-    // defines fields and value types per exclusion baseline
+  "inputTypes": {
+    // defines fields and value types for all baseline cards
+  },
+  "valueValidations":{
+      // defines field value validation checks
   },
    "graphQueries": {
     // defines graph queries used in UI (when online)
@@ -245,6 +263,7 @@ Enable debug mode to get detailed information about:
 - When importing a configuration file, the Exclusions, Annotations, and Omissions tabs do not refresh, though the data is successfully imported and visible in the Preview. Adding new items to an existing policy may overwrite the imported data. A fix is planned for a future update.
 - Clicking between `New Session` and `Import` multiple times may cause UI issues. Close UI and relaunch is the recommended
 - The UI does not support YAML anchors or aliases at this time.
+- THe UI does not support JSON export at this time
 - The `-Online` parameter does not support using a service principal at this time. It must be interactive
 
 ## Development
@@ -269,8 +288,8 @@ Follow the main ScubaGear contribution guidelines when making changes to this mo
 
 ## Version History
 
-- **1.10.0**: Current version with full UI functionality
-- Previous versions: See main ScubaGear changelog
+- **1.12.0**: Current version with full configuration functionality
+- Previous versions: See [ScubaGearAppUI changelog](../../PowerShell/ScubaGear/Modules/ScubaConfig/SCUBACONFIGAPPUI_CHANGELOG.md)
 
 ## License
 

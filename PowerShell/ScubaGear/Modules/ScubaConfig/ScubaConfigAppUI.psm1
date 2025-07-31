@@ -7,7 +7,7 @@ Function Invoke-SCuBAConfigAppUI {
     .EXAMPLE
     Invoke-SCuBAConfigAppUI
     # Opens the ScubaConfig UI.
-    .PARAMETER YAMLConfigFile
+    .PARAMETER ConfigFilePath
     Specifies the YAML configuration file to load. If not provided, the default configuration will be used.
     .PARAMETER Language
     Specifies the language for the UI. Default is 'en-US'.
@@ -25,7 +25,7 @@ Function Invoke-SCuBAConfigAppUI {
 
     [CmdletBinding(DefaultParameterSetName = 'Offline')]
     Param(
-        $YAMLConfigFile,
+        $ConfigFilePath,
 
         [ValidateSet('en-US')]
         $Language = 'en-US',
@@ -92,14 +92,14 @@ Function Invoke-SCuBAConfigAppUI {
     $syncHash.GraphConnected = $Online
     $syncHash.XamlPath = "$PSScriptRoot\ScubaConfigAppUI.xaml"
     $syncHash.UIConfigPath = "$PSScriptRoot\ScubaConfig_$Language.json"
-    $syncHash.YAMLImport = $YAMLConfigFile
+    $syncHash.YAMLImport = $ConfigFilePath
     $syncHash.GraphEndpoint = $GraphEndpoint
     $syncHash.M365Environment = $M365Environment
-    $syncHash.Exclusions = @{}
-    $syncHash.Omissions = @{}
-    $syncHash.Annotations = @{}
-    $syncHash.GeneralSettings = @{}
-    $syncHash.AdvancedSettings = @{}
+    $syncHash.Exclusions = [ordered]@{}
+    $syncHash.Omissions = [ordered]@{}
+    $syncHash.Annotations = [ordered]@{}
+    $syncHash.GeneralSettings = [ordered]@{}
+    $syncHash.AdvancedSettings = [ordered]@{}
     $syncHash.BulkUpdateInProgress = $false
     $syncHash.DataChanged = $false
     $syncHash.DebugOutputQueue = [System.Collections.Queue]::Synchronized([System.Collections.Queue]::new())  # first in first out: for debug screen
@@ -172,56 +172,7 @@ Function Invoke-SCuBAConfigAppUI {
 
         $syncHash.DebugMode = $syncHash.UIConfigs.DebugMode
 
-        # Initialize-DynamicTabs function should be called BEFORE processing any import
-        Initialize-DynamicTabs
-
-        # Add event to placeholder TextBoxes
-        foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
-            $control = $syncHash.$placeholderKey
-            if ($control -is [System.Windows.Controls.TextBox]) {
-                $placeholderText = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
-                Initialize-PlaceholderTextBox -TextBox $control -PlaceholderText $placeholderText
-            }
-        }
-
-        # If YAMLImport is specified, load the YAML configuration
-        # Process YAMLConfigFile parameter AFTER UI is fully initialized
-        If($syncHash.YAMLImport){
-            try {
-                Write-DebugOutput -Message "Processing YAMLConfigFile parameter: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
-                $syncHash.YAMLConfig = Get-Content -Path $syncHash.YAMLImport -Raw | ConvertFrom-Yaml
-                Write-DebugOutput -Message "YAMLConfig loaded: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
-                 
-                # Clear existing data structures
-                $syncHash.Exclusions = @{}
-                $syncHash.Omissions = @{}
-                $syncHash.Annotations = @{}
-                $syncHash.GeneralSettings = @{}
-                $syncHash.AdvancedSettings = @{}
-                
-                # Import the YAML configuration into data structures
-                Import-YamlToDataStructures -Config $syncHash.YAMLConfig
-                Write-DebugOutput -Message "YAMLConfig imported into data structures" -Source "UI Launch" -Level "Info"
-                
-                # Trigger UI update through reactive system
-                Set-DataChanged
-                Write-DebugOutput -Message "YAMLConfig UI update triggered" -Source "UI Launch" -Level "Info"
-            }
-            catch {
-                Write-DebugOutput -Message "Error processing YAMLConfigFile: $($_.Exception.Message)" -Source "UI Launch" -Level "Error"
-                [System.Windows.MessageBox]::Show("Error importing configuration file: $($_.Exception.Message)", "Import Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
-            }
-        }
-
-        $syncHash.Window.Dispatcher.Invoke([Action]{
-            try {
-                $syncHash.Debug_TextBox.AppendText("UI START`r`n")
-                $syncHash.Debug_TextBox.ScrollToEnd()
-            } catch {
-                Write-Error "Dispatcher error: $($_.Exception.Message)"
-            }
-        })
-
+        <#
         # Create a DispatcherTimer for periodic UI updates and debug log flushing
         $syncHash.UIUpdateTimer = New-Object System.Windows.Threading.DispatcherTimer
         $syncHash.UIUpdateTimer.Interval = [System.TimeSpan]::FromMilliseconds(500)
@@ -257,8 +208,8 @@ Function Invoke-SCuBAConfigAppUI {
                 # ===================== GENERAL UI UPDATE =====================
 
                 # Auto-collect general settings from UI controls
-                Save-GeneralSettingsFromInput
-                Save-AdvancedSettingsFromInput
+                #Save-GeneralSettingsFromInput
+                #Save-AdvancedSettingsFromInput
 
                 # Only update if there have been changes
                 if ($syncHash.DataChanged) {
@@ -285,19 +236,21 @@ Function Invoke-SCuBAConfigAppUI {
 
             }
         })
+        #>
 
 
         # Initialize change tracking
         $syncHash.DataChanged = $false
 
         Write-DebugOutput -Message "UI initialization started - creating timer and data structures" -Source "UI Initialization" -Level "Info"
-
+        <#
         $syncHash.LastUpdateHash = @{
             Exclusions = ""
             Omissions = ""
             Annotations = ""
             GeneralSettings = ""
         }
+        #>
 
 
         # Function to mark data as changed
@@ -463,67 +416,7 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
-        # Helper function to recursively remove event handlers
-        Function Remove-AllEventHandlers {
-            <#
-            .SYNOPSIS
-            Recursively removes event handlers from all controls in the UI.
-            .DESCRIPTION
-            This function traverses the visual tree and removes event handlers from controls to prevent memory leaks during application cleanup.
-            #>
-            param(
-                [System.Windows.DependencyObject]$Parent
-            )
 
-            if ($null -eq $Parent) { return }
-
-            try {
-                # Remove common event handlers - use try-catch for each to avoid stopping on errors
-                switch ($Parent.GetType().Name) {
-                    'Button' {
-                        try {
-                            # Clear the click event handlers
-                            $Parent.ClearValue([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)
-                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
-                    }
-                    'TextBox' {
-                        try {
-                            $Parent.ClearValue([System.Windows.Controls.TextBox]::TextChangedEvent)
-                            $Parent.ClearValue([System.Windows.UIElement]::GotFocusEvent)
-                            $Parent.ClearValue([System.Windows.UIElement]::LostFocusEvent)
-                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
-                    }
-                    'CheckBox' {
-                        try {
-                            $Parent.ClearValue([System.Windows.Controls.Primitives.ToggleButton]::CheckedEvent)
-                            $Parent.ClearValue([System.Windows.Controls.Primitives.ToggleButton]::UncheckedEvent)
-                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
-                    }
-                    'ComboBox' {
-                        try {
-                            $Parent.ClearValue([System.Windows.Controls.Primitives.Selector]::SelectionChangedEvent)
-                        } catch {  Write-DebugOutput -Message ($syncHash.UIConfigs.localeErrorMessages.RemoveEventHandlerError -f $Parent.GetType().Name) -Source "Event Handler Cleanup" -Level "Warning"}
-                    }
-                }
-
-                # Recursively process children
-                $childCount = [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($Parent)
-                for ($i = 0; $i -lt $childCount; $i++) {
-                    $child = [System.Windows.Media.VisualTreeHelper]::GetChild($Parent, $i)
-                    Remove-AllEventHandlers -Parent $child
-                }
-
-            } catch {
-                # Silently continue if we can't remove handlers - but add to debug if possible
-                if ($syncHash.DebugOutputQueue) {
-                    try {
-                        $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
-                        $logEntry = "[$timestamp] [Warning] [Event Handler Cleanup] Could not remove event handlers from $($Parent.GetType().Name): $($_.Exception.Message)"
-                        $syncHash.DebugOutputQueue.Enqueue($logEntry)
-                    } catch { Write-Error "Failed to add debug message: $($_.Exception.Message)" }
-                }
-            }
-        }
 
         # Enhanced memory cleanup function that also uses debug queue
         Function Invoke-MemoryCleanup {
@@ -605,7 +498,7 @@ Function Invoke-SCuBAConfigAppUI {
         }
 
         # Add cleanup function to syncHash
-        $syncHash.InvokeMemoryCleanup = { Invoke-MemoryCleanup }
+        #$syncHash.InvokeMemoryCleanup = { Invoke-MemoryCleanup }
 
         # Function to initialize placeholder text behavior for TextBox controls
         Function Initialize-PlaceholderTextBox {
@@ -665,8 +558,6 @@ Function Invoke-SCuBAConfigAppUI {
                     $this.FontStyle = "Italic"
                 }
             }.GetNewClosure())
-
-#param($sender, $e)
         }
 
         # Helper function to find control by setting name
@@ -816,25 +707,18 @@ Function Invoke-SCuBAConfigAppUI {
 
         # Function to validate UI field based on regex and required status
         Function Confirm-RequiredField {
-            <#
-            .SYNOPSIS
-            Validates UI field values using regex patterns and required field checks.
-            .DESCRIPTION
-            This function performs validation on user input fields using regular expressions and enforces required field constraints.
-            #>
             param(
                 [System.Windows.Controls.Control]$UIElement,
                 [string]$RegexPattern,
                 [string]$ErrorMessage,
                 [string]$PlaceholderText = "",
-                [switch]$ShowMessageBox
+                [switch]$ShowMessageBox,
+                [switch]$TestPath,           # NEW: Test if path exists
+                [string[]]$RequiredFiles     # NEW: Array of required files in the path
             )
 
             $isValid = $true
             $currentValue = ""
-
-            #debug
-            If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput ("Validating [{0}] is not null and does not have placeholder [{1}]..." -f $UIElement.Name, $PlaceholderText) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
 
             # Get the current value based on control type
             if ($UIElement -is [System.Windows.Controls.TextBox]) {
@@ -849,10 +733,30 @@ Function Invoke-SCuBAConfigAppUI {
             }
             # Check regex pattern if provided and field has content
             elseif (![string]::IsNullOrWhiteSpace($RegexPattern) -and
-                     ![string]::IsNullOrWhiteSpace($currentValue) -and
-                     $currentValue -ne $PlaceholderText -and
-                     -not ($currentValue -match $RegexPattern)) {
+                    ![string]::IsNullOrWhiteSpace($currentValue) -and
+                    $currentValue -ne $PlaceholderText -and
+                    -not ($currentValue -match $RegexPattern)) {
                 $isValid = $false
+            }
+            # NEW: Check path existence if TestPath is specified
+            elseif ($TestPath -and ![string]::IsNullOrWhiteSpace($currentValue) -and $currentValue -ne $PlaceholderText) {
+                if (-not (Test-Path $currentValue)) {
+                    $isValid = $false
+                }
+                # Check for required files if specified
+                elseif ($RequiredFiles -and $RequiredFiles.Count -gt 0) {
+                    $foundRequiredFile = $false
+                    foreach ($requiredFile in $RequiredFiles) {
+                        $fullPath = Join-Path $currentValue $requiredFile
+                        if (Test-Path $fullPath) {
+                            $foundRequiredFile = $true
+                            break
+                        }
+                    }
+                    if (-not $foundRequiredFile) {
+                        $isValid = $false
+                    }
+                }
             }
 
             # Apply visual feedback
@@ -866,11 +770,8 @@ Function Invoke-SCuBAConfigAppUI {
                 }
             }
 
-            #debug
-            If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput ("Element [{0}] has value: {1}. IsValid: {2}" -f $UIElement.Name, $currentValue, $isValid) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
-
             # Show error message if requested
-            if (-not $isValid -and $ShowMessageBox) {
+            if (-not $isValid -and $ShowMessageBox -and ![string]::IsNullOrWhiteSpace($ErrorMessage)) {
                 [System.Windows.MessageBox]::Show($ErrorMessage, "Validation Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
             }
 
@@ -909,14 +810,6 @@ Function Invoke-SCuBAConfigAppUI {
         #===========================================================================
         # UPDATE UI FUNCTIONS
         #===========================================================================
-
-        <# Function to update all UI elements from the data structures:
-            $syncHash.GeneralSettings | ConvertTo-Json -Depth 5
-            $syncHash.AdvancedSettings | ConvertTo-Json -Depth 5
-            $syncHash.Exclusions | ConvertTo-Json -Depth 5
-            $syncHash.Annotations | ConvertTo-Json -Depth 5
-            $syncHash.Omissions | ConvertTo-Json -Depth 5
-        #>
         Function Update-AllUIFromData {
             <#
             .SYNOPSIS
@@ -924,24 +817,34 @@ Function Invoke-SCuBAConfigAppUI {
             .DESCRIPTION
             This function refreshes all UI components to reflect the current state of the configuration data.
             #>
-            # Update general settings
-            Update-GeneralSettingsFromData
+            # At the end of Import-YamlToDataStructures, add:
+            try {
+                # Update general settings (textboxes, comboboxes)
+                Update-GeneralSettingsFromData
 
-            # update advanced settings
-            Update-AdvancedSettingsFromData
+                # Update advanced settings
+                Update-AdvancedSettingsFromData
 
-            # Handle Product Name CheckBox
-            Update-ProductNameCheckboxFromData
+                # Update product checkboxes
+                Update-ProductNameCheckboxFromData
 
-            # Update exclusions
-            Update-ExclusionsFromData
+                # Update exclusions tabs/cards
+                Update-ExclusionsFromData
 
-            # Update annotations
-            Update-AnnotationsFromData
+                # Update annotations
+                Update-AnnotationsFromData
 
-            # Update omissions
-            Update-OmissionsFromData
+                # Update omissions
+                Update-OmissionsFromData
+
+                Write-DebugOutput -Message "All UI elements updated from imported YAML data" -Source $MyInvocation.MyCommand.Name -Level "Info"
+            }
+            catch {
+                Write-DebugOutput -Message "Error updating UI from imported data: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
+            }
+
         }
+
 
 
         # Function to update general settings UI from data (Dynamic Version)
@@ -989,21 +892,21 @@ Function Invoke-SCuBAConfigAppUI {
             try {
                 # First, determine which sections need to be enabled based on imported data
                 $sectionsToEnable = @()
-                
+
                 if ($syncHash.UIConfigs.advancedSections) {
                     foreach ($toggleName in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
                         $sectionConfig = $syncHash.UIConfigs.advancedSections.$toggleName
-                        
+
                         # Check if any setting from this section exists in imported data
                         $sectionHasData = $false
                         foreach ($fieldControlName in $sectionConfig.fields) {
                             $settingName = $fieldControlName -replace '_TextBox$|_CheckBox$', ''
-                            if ($syncHash.AdvancedSettings.ContainsKey($settingName)) {
+                            if ($syncHash.AdvancedSettings.Contains($settingName)) {
                                 $sectionHasData = $true
                                 break
                             }
                         }
-                        
+
                         # Enable the toggle if this section has data
                         if ($sectionHasData) {
                             $sectionsToEnable += $toggleName
@@ -1016,7 +919,7 @@ Function Invoke-SCuBAConfigAppUI {
                     }
                 }
 
-                
+
 
                 # Now update the actual field values
                 foreach ($settingKey in $syncHash.AdvancedSettings.Keys) {
@@ -1123,7 +1026,7 @@ Function Invoke-SCuBAConfigAppUI {
                             $omissionTab.IsEnabled = $true
                             $container = $syncHash.("$($productId)OmissionContent")
                             if ($container -and $container.Children.Count -eq 0) {
-                                New-ProductOmissions -ProductName $productId -Container $container
+                                New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Omissions"
                                 If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.CreatedOmissionContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                             }
                         }
@@ -1134,7 +1037,7 @@ Function Invoke-SCuBAConfigAppUI {
                             $annotationTab.IsEnabled = $true
                             $container = $syncHash.("$($productId)AnnotationContent")
                             if ($container -and $container.Children.Count -eq 0) {
-                                New-ProductAnnotations -ProductName $productId -Container $container
+                                New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Annotations"
                                 If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.CreatedAnnotationContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                             }
                         }
@@ -1146,7 +1049,7 @@ Function Invoke-SCuBAConfigAppUI {
                                 $exclusionTab.IsEnabled = $true
                                 $container = $syncHash.("$($productId)ExclusionContent")
                                 if ($container -and $container.Children.Count -eq 0) {
-                                    New-ProductExclusions -ProductName $productId -Container $container
+                                    New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Exclusions"
                                     If($syncHash.DebugMode -match 'Debug'){Write-DebugOutput -Message ($syncHash.UIConfigs.LocaleDebugOutput.CreatedExclusionContentDebug -f $productId) -Source $MyInvocation.MyCommand.Name -Level "Debug"}
                                 }
                             }
@@ -2931,7 +2834,6 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
-
         #===========================================================================
         # Graph Selection Function
         #===========================================================================
@@ -3266,7 +3168,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Create columns based on ColumnConfig
                 foreach ($columnKey in $keyOrder) {
-                    if ($ColumnConfig.ContainsKey($columnKey)) {
+                    if ($ColumnConfig.Contains($columnKey)) {
                         $column = New-Object System.Windows.Controls.DataGridTextColumn
                         $column.Header = $ColumnConfig[$columnKey].Header
                         $column.Binding = New-Object System.Windows.Data.Binding($columnKey)
@@ -3389,12 +3291,296 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
+                #===========================================================================
+        # YAML IMPORT PROGRESS FUNCTIONS
+        #===========================================================================
 
+        Function Show-YamlImportProgress {
+            <#
+            .SYNOPSIS
+            Shows a progress window during YAML import operations.
+            .DESCRIPTION
+            This function creates a separate runspace with a XAML-based progress window for YAML import operations.
+            It provides real-time feedback during the import process.
+            #>
+            param(
+                [Parameter(Mandatory=$true)]
+                [string]$YamlFilePath,
+                [string]$WindowTitle = "Importing Configuration",
+                [string]$InitialMessage = "Loading YAML configuration..."
+            )
+
+            # XAML for the progress window
+            $xaml = @"
+<Window x:Class="YamlImport.Progress"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="$WindowTitle"
+    WindowStyle="None"
+    WindowStartupLocation="CenterScreen"
+    Height="200" Width="450"
+    ResizeMode="NoResize"
+    ShowInTaskbar="False"
+    Topmost="True">
+    <Window.Resources>
+        <Style TargetType="Label">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+        </Style>
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Margin" Value="20,10,20,20"/>
+            <Setter Property="Foreground" Value="#0078D4"/>
+        </Style>
+    </Window.Resources>
+    <Grid Background="#313130">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title/Icon Row -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Center" Margin="20,20,20,10">
+            <TextBlock Text="&#x1F4E5;" FontSize="24" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <Label Content="$WindowTitle" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Message Row -->
+        <Label x:Name="lblMessage" Grid.Row="1" Content="$InitialMessage"
+               HorizontalAlignment="Center" VerticalAlignment="Center"
+               Margin="20,0,20,0"/>
+
+        <!-- Progress Bar Row -->
+        <ProgressBar x:Name="YamlImportProgressBar" Grid.Row="2"
+                     IsIndeterminate="True" Margin="20,10,20,10"/>
+
+        <!-- Status Row -->
+        <Label x:Name="lblStatus" Grid.Row="3" Content="Please wait..."
+               HorizontalAlignment="Center" Margin="20,0,20,10"
+               FontSize="10" Opacity="0.8"/>
+    </Grid>
+</Window>
+"@
+            [string]$xaml = $xaml -replace 'mc:Ignorable="d"','' -replace "x:N",'N' -replace '^<Win.*', '<Window' -replace 'Click=".*','/>'
+
+            # Create the runspace for the progress window
+            $progressRunspace = [runspacefactory]::CreateRunspace()
+            $progressRunspace.ApartmentState = "STA"
+            $progressRunspace.ThreadOptions = "ReuseThread"
+            $progressRunspace.Open()
+
+            # Share variables with the progress runspace
+            $progressRunspace.SessionStateProxy.SetVariable("xaml", $xaml)
+            $progressRunspace.SessionStateProxy.SetVariable("syncHash", $syncHash)
+            $progressRunspace.SessionStateProxy.SetVariable("YamlFilePath", $YamlFilePath)
+
+            # Create PowerShell instance for progress window
+            $progressPowerShell = [powershell]::Create()
+            $progressPowerShell.Runspace = $progressRunspace
+
+            # Script for the progress window
+            $progressScript = {
+                Add-Type -AssemblyName PresentationFramework
+                Add-Type -AssemblyName PresentationCore
+                Add-Type -AssemblyName WindowsBase
+
+                try {
+                    # Parse XAML
+                    $reader = [System.Xml.XmlReader]::Create([System.IO.StringReader]::new($xaml))
+                    $progressWindow = [Windows.Markup.XamlReader]::Load($reader)
+                    $reader.Close()
+
+                    # Get controls
+                    $lblMessage = $progressWindow.FindName("lblMessage")
+                    $lblStatus = $progressWindow.FindName("lblStatus")
+                    $progressBar = $progressWindow.FindName("YamlImportProgressBar")
+
+                    # Create shared hashtable for communication
+                    $progressSync = [hashtable]::Synchronized(@{
+                        Window = $progressWindow
+                        Message = $lblMessage
+                        Status = $lblStatus
+                        ProgressBar = $progressBar
+                        ShouldClose = $false
+                        Error = $null
+                    })
+
+                    # Store in main syncHash for communication
+                    $syncHash.ProgressSync = $progressSync
+
+                    # Update message function
+                    
+                    $updateMessage = {
+                        #https://github.com/PowerShell/PSScriptAnalyzer/issues/1472
+                        [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSReviewUnusedParameter", "message")]
+                        [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSReviewUnusedParameter", "status")]
+                        param($message, $status)
+                        $progressSync.Window.Dispatcher.Invoke([Action]{
+                            if ($message) { $progressSync.Message.Content = $message }
+                            if ($status) { $progressSync.Status.Content = $status }
+                        })
+                    }
+
+                    # Store update function
+                    $syncHash.UpdateProgressMessage = $updateMessage
+
+                    # Show window and wait
+                    $progressWindow.ShowDialog()
+
+                } catch {
+                    # Store error for main thread
+                    if ($syncHash.ProgressSync) {
+                        $syncHash.ProgressSync.Error = $_.Exception.Message
+                    }
+                }
+            }
+
+            # Start the progress window
+            $progressPowerShell.AddScript($progressScript)
+            $progressHandle = $progressPowerShell.BeginInvoke()
+
+            # Wait for progress window to initialize
+            $timeout = 0
+            while (-not $syncHash.ProgressSync -and $timeout -lt 50) {
+                Start-Sleep -Milliseconds 100
+                $timeout++
+            }
+
+            if (-not $syncHash.ProgressSync) {
+                Write-Error -Message "Failed to initialize progress window"
+                return $null
+            }
+
+            # Return control objects
+            return @{
+                PowerShell = $progressPowerShell
+                Handle = $progressHandle
+                Runspace = $progressRunspace
+                UpdateMessage = $syncHash.UpdateProgressMessage
+                Close = {
+                    try {
+                        if ($syncHash.ProgressSync -and $syncHash.ProgressSync.Window) {
+                            $syncHash.ProgressSync.Window.Dispatcher.Invoke([Action]{
+                                $syncHash.ProgressSync.Window.Close()
+                            })
+                        }
+                    } catch {
+                        # Ignore close errors
+                        Write-Error -Message "Error closing progress window: $($_.Exception.Message)"
+                    }
+
+                    # Cleanup
+                    try {
+                        if ($progressHandle -and $progressPowerShell) {
+                            $progressPowerShell.EndInvoke($progressHandle)
+                        }
+                        if ($progressPowerShell) {
+                            $progressPowerShell.Dispose()
+                        }
+                        if ($progressRunspace) {
+                            $progressRunspace.Close()
+                            $progressRunspace.Dispose()
+                        }
+                    } catch {
+                        # Ignore cleanup errors
+                        Write-Error -Message "Error during cleanup: $($_.Exception.Message)"
+                    }
+
+                    # Remove from syncHash
+                    if ($syncHash.ProgressSync) {
+                        $syncHash.Remove("ProgressSync")
+                    }
+                    if ($syncHash.UpdateProgressMessage) {
+                        $syncHash.Remove("UpdateProgressMessage")
+                    }
+                }.GetNewClosure()
+            }
+        }
+
+        Function Invoke-YamlImportWithProgress {
+            <#
+            .SYNOPSIS
+            Imports YAML configuration with progress feedback.
+            .DESCRIPTION
+            This function handles the complete YAML import process with a progress window showing real-time status updates.
+            #>
+            param(
+                [Parameter(Mandatory=$true)]
+                [string]$YamlFilePath,
+                [string]$WindowTitle = "Importing Configuration"
+            )
+
+            $progress = $null
+            try {
+                # Show progress window
+                Write-DebugOutput -Message "Starting YAML import with progress for: $YamlFilePath" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                $progress = Show-YamlImportProgress -YamlFilePath $YamlFilePath -WindowTitle $WindowTitle
+
+                if (-not $progress) {
+                    throw "Failed to create progress window"
+                }
+
+                # Small delay to ensure window is visible
+                Start-Sleep -Milliseconds 300
+
+                # Step 1: Load YAML file
+                $progress.UpdateMessage.Invoke("Loading YAML file...", "Reading file content")
+                Start-Sleep -Milliseconds 200
+                $yamlContent = Get-Content -Path $YamlFilePath -Raw
+
+                # Step 2: Parse YAML
+                $progress.UpdateMessage.Invoke("Parsing YAML content...", "Converting to data structures")
+                Start-Sleep -Milliseconds 200
+                $yamlHash = $yamlContent | ConvertFrom-Yaml
+
+                # Step 3: Clear existing data
+                $progress.UpdateMessage.Invoke("Preparing for import...", "Clearing existing configuration")
+                Start-Sleep -Milliseconds 200
+                $syncHash.Exclusions = [ordered]@{}
+                $syncHash.Omissions = [ordered]@{}
+                $syncHash.Annotations = [ordered]@{}
+                $syncHash.GeneralSettings = [ordered]@{}
+                $syncHash.AdvancedSettings = [ordered]@{}
+
+                # Step 4: Import data structures
+                $progress.UpdateMessage.Invoke("Importing configuration data...", "Processing YAML sections")
+                Start-Sleep -Milliseconds 300
+                Import-YamlToDataStructures -Config $yamlHash
+
+                # Step 5: Update UI
+                $progress.UpdateMessage.Invoke("Updating user interface...", "Applying configuration to controls")
+                Start-Sleep -Milliseconds 400
+                Set-DataChanged
+
+                # Step 6: Final processing
+                $progress.UpdateMessage.Invoke("Finalizing import...", "Configuration applied successfully")
+                Start-Sleep -Milliseconds 300
+
+                Write-DebugOutput -Message "YAML import completed successfully" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                return $true
+
+            } catch {
+                Write-DebugOutput -Message "Error during YAML import: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
+                if ($progress -and $progress.UpdateMessage) {
+                    $progress.UpdateMessage.Invoke("Import failed!", "Error: $($_.Exception.Message)")
+                    Start-Sleep -Milliseconds 1500
+                }
+                throw
+            } finally {
+                # Always close progress window
+                if ($progress -and $progress.Close) {
+                    $progress.Close.Invoke()
+                }
+            }
+        }
         #======================================================
         # YAML CONTROL
         #======================================================
         # Function to import YAML data into core data structures (without UI updates)
-                Function Import-YamlToDataStructures {
+        Function Import-YamlToDataStructures {
             <#
             .SYNOPSIS
             Imports YAML configuration data into internal data structures.
@@ -3406,7 +3592,7 @@ Function Invoke-SCuBAConfigAppUI {
             try {
                 # Initialize AdvancedSettings if not exists
                 if (-not $syncHash.AdvancedSettings) {
-                    $syncHash.AdvancedSettings = @{}
+                    $syncHash.AdvancedSettings = [ordered]@{}
                 }
 
                 # Get top-level keys (now always hashtable)
@@ -3437,12 +3623,12 @@ Function Invoke-SCuBAConfigAppUI {
                         # Expand '*' to all available products
                         $syncHash.GeneralSettings[$field] = $productIds
                         Write-DebugOutput -Message "Imported general setting (expanded wildcard): $field = $($productIds -join ', ')" -Source $MyInvocation.MyCommand.Name -Level "Info"
-                    } 
+                    }
                     # Check if this field belongs to advanced settings
                     elseif ($field -in $advancedSettingsList) {
                         $syncHash.AdvancedSettings[$field] = $Config[$field]
                         Write-DebugOutput -Message "Imported advanced setting: $field = $($Config[$field])" -Source $MyInvocation.MyCommand.Name -Level "Info"
-                    } 
+                    }
                     else {
                         $syncHash.GeneralSettings[$field] = $Config[$field]
                         Write-DebugOutput -Message "Imported general setting: $field = $($Config[$field])" -Source $MyInvocation.MyCommand.Name -Level "Info"
@@ -3469,15 +3655,15 @@ Function Invoke-SCuBAConfigAppUI {
                                     $yamlKeyName = if ($FieldListConfig) { $FieldListConfig.name } else { $baseline.exclusionField }
 
                                     # Check if the policy data contains the expected exclusionField key
-                                    if ($policyData.ContainsKey($yamlKeyName)) {
+                                    if ($policyData.Contains($yamlKeyName)) {
                                         # Initialize product level if not exists
                                         if (-not $syncHash.Exclusions[$productName]) {
-                                            $syncHash.Exclusions[$productName] = @{}
+                                            $syncHash.Exclusions[$productName] = [ordered]@{}
                                         }
 
                                         # Initialize policy level if not exists
                                         if (-not $syncHash.Exclusions[$productName][$policyId]) {
-                                            $syncHash.Exclusions[$productName][$policyId] = @{}
+                                            $syncHash.Exclusions[$productName][$policyId] = [ordered]@{}
                                         }
 
                                         # Extract the field data from inside the exclusionField
@@ -3512,16 +3698,16 @@ Function Invoke-SCuBAConfigAppUI {
                         if ($productName) {
                             # Initialize product level if not exists
                             if (-not $syncHash.Omissions[$productName]) {
-                                $syncHash.Omissions[$productName] = @{}
+                                $syncHash.Omissions[$productName] = [ordered]@{}
                             }
 
                             # Initialize policy level if not exists
                             if (-not $syncHash.Omissions[$productName][$policyId]) {
-                                $syncHash.Omissions[$productName][$policyId] = @{}
+                                $syncHash.Omissions[$productName][$policyId] = [ordered]@{}
                             }
 
-                            # Store using the structure expected by save functions: Product -> PolicyId -> "Omit" -> Field data
-                            $syncHash.Omissions[$productName][$policyId]["Omit"] = @{
+                            # Store using the structure expected by save functions: Product -> PolicyId -> "OmitPolicy" -> Field data
+                            $syncHash.Omissions[$productName][$policyId]["OmitPolicy"] = @{
                                 Rationale = $omissionData["Rationale"]
                                 Expiration = $omissionData["Expiration"]
                             }
@@ -3531,7 +3717,7 @@ Function Invoke-SCuBAConfigAppUI {
                     }
                 }
 
-                # Import Annotations - FIXED structure to match save functions  
+                # Import Annotations - FIXED structure to match save functions
                 if ($topLevelKeys -contains "AnnotatePolicy") {
                     $annotationKeys = $Config["AnnotatePolicy"].Keys
 
@@ -3551,16 +3737,16 @@ Function Invoke-SCuBAConfigAppUI {
                         if ($productName) {
                             # Initialize product level if not exists
                             if (-not $syncHash.Annotations[$productName]) {
-                                $syncHash.Annotations[$productName] = @{}
+                                $syncHash.Annotations[$productName] = [ordered]@{}
                             }
 
-                            # Initialize policy level if not exists  
+                            # Initialize policy level if not exists
                             if (-not $syncHash.Annotations[$productName][$policyId]) {
-                                $syncHash.Annotations[$productName][$policyId] = @{}
+                                $syncHash.Annotations[$productName][$policyId] = [ordered]@{}
                             }
 
-                            # Store using the structure expected by save functions: Product -> PolicyId -> "Annotate" -> Field data
-                            $syncHash.Annotations[$productName][$policyId]["Annotate"] = @{
+                            # Store using the structure expected by save functions: Product -> PolicyId -> "AnnotatePolicy" -> Field data
+                            $syncHash.Annotations[$productName][$policyId]["AnnotatePolicy"] = @{
                                 Comment = $annotationData["Comment"]
                             }
 
@@ -3569,30 +3755,17 @@ Function Invoke-SCuBAConfigAppUI {
                     }
                 }
 
+                 Write-DebugOutput -Message "Successfully imported YAML data to data structures" -Source $MyInvocation.MyCommand.Name -Level "Info"
+                # Update UI controls to reflect imported data
+                Update-AllUIFromData
+                Write-DebugOutput -Message "UI controls updated from imported data" -Source $MyInvocation.MyCommand.Name -Level "Info"
+
             }
             catch {
                 Write-DebugOutput -Message "Error importing data: $($_.Exception.Message)" -Source $MyInvocation.MyCommand.Name -Level "Error"
             }
         }
 
-        <#
-        Function New-DynamicYamlSections {
-            foreach ($baselineControl in $syncHash.UIConfigs.baselineControls) {
-                $dataHashtable = $syncHash.($baselineControl.dataControlOutput)
-
-                if ($dataHashtable -and $dataHashtable.Keys.Count -gt 0) {
-                    $yamlPreview += "`n`n$($baselineControl.yamlValue):"
-
-                    # Generate content based on the data structure
-                    foreach ($productName in $dataHashtable.Keys) {
-                        foreach ($policyId in $dataHashtable[$productName].Keys) {
-                            # Dynamic YAML generation logic here
-                        }
-                    }
-                }
-            }
-        }
-        #>
         Function New-YamlPreview {
             <#
             .SYNOPSIS
@@ -3612,10 +3785,10 @@ Function Invoke-SCuBAConfigAppUI {
                     foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
                         # Convert control name to setting name (remove _TextBox suffix)
                         $settingName = $placeholderKey -replace '_TextBox$', ''
-                        
-                        if ($syncHash.GeneralSettings.ContainsKey($settingName)) {
+
+                        if ($syncHash.GeneralSettings.Contains($settingName)) {
                             $settingValue = $syncHash.GeneralSettings[$settingName]
-                            
+
                             if (![string]::IsNullOrWhiteSpace($settingValue)) {
                                 # Handle special formatting for description
                                 if ($settingName -eq 'Description') {
@@ -3628,9 +3801,9 @@ Function Invoke-SCuBAConfigAppUI {
                         }
                     }
                 }
-                
+
                 # Add any other general settings not in localePlaceholder
-                foreach ($settingKey in $syncHash.GeneralSettings.Keys) {
+                foreach ($settingKey in ($syncHash.GeneralSettings.Keys | Sort-Object)) {
                     # Skip if already processed above
                     $alreadyProcessed = $false
                     if ($syncHash.UIConfigs.localePlaceholder) {
@@ -3642,7 +3815,7 @@ Function Invoke-SCuBAConfigAppUI {
                             }
                         }
                     }
-                    
+
                     #exclude specific keys that are handled separately
                     if (-not $alreadyProcessed -and $settingKey -ne "ProductNames" -and $settingKey -ne "M365Environment") {
                         $settingValue = $syncHash.GeneralSettings[$settingKey]
@@ -3664,25 +3837,24 @@ Function Invoke-SCuBAConfigAppUI {
 
             # Handle M365Environment
             $selectedEnv = $syncHash.UIConfigs.M365Environment | Where-Object { $_.id -eq $syncHash.M365Environment_ComboBox.SelectedItem.Tag } | Select-Object -ExpandProperty name
-            $yamlPreview += "`n`nM365Environment: $selectedEnv"
-            $yamlPreview += "`n"
+            $yamlPreview += "`nM365Environment: $selectedEnv"
 
             # Process advanced settings from data structure instead of UI controls
             if ($syncHash.AdvancedSettings -and $syncHash.AdvancedSettings.Count -gt 0) {
                 $yamlPreview += "`n`n# Advanced Settings"
-                
+
                 # Group advanced settings by section for better organization
                 if ($syncHash.UIConfigs.advancedSections) {
                     foreach ($toggleName in $syncHash.UIConfigs.advancedSections.PSObject.Properties.Name) {
                         $sectionConfig = $syncHash.UIConfigs.advancedSections.$toggleName
                         $sectionSettings = @()
-                        
+
                         # Check if any settings from this section are present
                         foreach ($fieldControlName in $sectionConfig.fields) {
                             $settingName = $fieldControlName -replace '_TextBox$|_CheckBox$', ''
-                            if ($syncHash.AdvancedSettings.ContainsKey($settingName)) {
+                            if ($syncHash.AdvancedSettings.Contains($settingName)) {
                                 $settingValue = $syncHash.AdvancedSettings[$settingName]
-                                
+
                                 # Format the value appropriately
                                 if ($settingValue -is [bool]) {
                                     $formattedValue = $settingValue.ToString().ToLower()
@@ -3691,11 +3863,11 @@ Function Invoke-SCuBAConfigAppUI {
                                 } else {
                                     $formattedValue = $settingValue
                                 }
-                                
+
                                 $sectionSettings += "`n$settingName`: $formattedValue"
                             }
                         }
-                        
+
                         # Add section comment and settings if any exist
                         if ($sectionSettings.Count -gt 0) {
                             $yamlPreview += "`n# $($sectionConfig.sectionName)"
@@ -3704,9 +3876,9 @@ Function Invoke-SCuBAConfigAppUI {
                     }
                 } else {
                     # Fallback: output all advanced settings without grouping
-                    foreach ($settingKey in $syncHash.AdvancedSettings.Keys) {
+                    foreach ($settingKey in ($syncHash.AdvancedSettings.Keys | Sort-Object)) {
                         $settingValue = $syncHash.AdvancedSettings[$settingKey]
-                        
+
                         if ($settingValue -is [bool]) {
                             $formattedValue = $settingValue.ToString().ToLower()
                         } elseif ($settingValue -match '\\|:') {
@@ -3714,20 +3886,24 @@ Function Invoke-SCuBAConfigAppUI {
                         } else {
                             $formattedValue = $settingValue
                         }
-                        
+
                         $yamlPreview += "`n$settingKey`: $formattedValue"
                     }
                 }
             }
-            
 
+
+            If($syncHash.Exclusions.count -gt 0) {
+                $yamlPreview += "`n`n# Exclusions Section"
+            }
 
             # Handle Exclusions (unchanged - already hashtable)
-            foreach ($productName in $syncHash.Exclusions.Keys) {
+            foreach ($productName in ($syncHash.Exclusions.Keys | Sort-Object)) {
+
                 #$productHasExclusions = $false
                 $productExclusions = @()
 
-                foreach ($policyId in $syncHash.Exclusions[$productName].Keys) {
+                foreach ($policyId in ($syncHash.Exclusions[$productName].Keys | Sort-Object)) {
                     $baseline = $syncHash.UIConfigs.baselines.$productName | Where-Object { $_.id -eq $policyId }
 
                     $policyBlock = @()
@@ -3740,7 +3916,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                     $exclusions = $syncHash.Exclusions[$productName][$policyId]
 
-                    foreach ($exclusionKey in $exclusions.Keys) {
+                    foreach ($exclusionKey in ($exclusions.Keys | Sort-Object)) {
                         $exclusionData = $exclusions[$exclusionKey]
 
                         if ($null -ne $exclusionData -and ($exclusionData -isnot [System.Collections.ICollection] -or $exclusionData.Count -gt 0)) {
@@ -3799,12 +3975,13 @@ Function Invoke-SCuBAConfigAppUI {
             }
 
             if ($annotationCount -gt 0) {
+                $yamlPreview += "`n`n# Annotations Section"
                 # Get the YAML section name from UIConfig
                 $annotationSectionName = $syncHash.UIConfigs.inputTypes.annotation.value
-                $yamlPreview += "`n`n$annotationSectionName`:"
+                $yamlPreview += "`n$annotationSectionName`:"
 
                 # Group annotations by product
-                foreach ($productName in $syncHash.Annotations.Keys) {
+                foreach ($productName in ($syncHash.Annotations.Keys | Sort-Object)) {
                     #$yamlPreview += "`n  # $productName Annotations:"
 
                     # Sort policies by ID
@@ -3824,7 +4001,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                         # Access the nested annotation data correctly
                         # The structure is: $syncHash.Annotations[Product][PolicyId][AnnotationType][FieldName]
-                        # We need to get the annotation type (like "Annotate") first
+                        # We need to get the annotation type (like "AnnotatePolicy") first
                         foreach ($annotationType in $annotationData.Keys) {
                             $annotation = $annotationData[$annotationType]
 
@@ -3868,12 +4045,13 @@ Function Invoke-SCuBAConfigAppUI {
             }
 
             if ($omissionCount -gt 0) {
+                $yamlPreview += "`n`n# Omissions Section"
                 # Get the YAML section name from UIConfig
                 $omissionSectionName = $syncHash.UIConfigs.inputTypes.omissions.value
-                $yamlPreview += "`n`n$omissionSectionName`:"
+                $yamlPreview += "`n$omissionSectionName`:"
 
                 # Group omissions by product
-                foreach ($productName in $syncHash.Omissions.Keys) {
+                foreach ($productName in ($syncHash.Omissions.Keys | Sort-Object)) {
                     #$yamlPreview += "`n  # $productName Omissions:"
 
                     # Sort policies by ID
@@ -3893,7 +4071,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                         # Access the nested omission data correctly
                         # The structure is: $syncHash.Omissions[Product][PolicyId][OmissionType][FieldName]
-                        # We need to get the omission type (like "Omit") first
+                        # We need to get the omission type (like "OmitPolicy") first
                         foreach ($omissionType in $omissionData.Keys) {
                             $omission = $omissionData[$omissionType]
 
@@ -3954,10 +4132,10 @@ Function Invoke-SCuBAConfigAppUI {
             #>
 
             # Clear core data structures
-            $syncHash.Exclusions = @{}
-            $syncHash.Omissions = @{}
-            $syncHash.Annotations = @{}
-            $syncHash.GeneralSettings = @{}
+            $syncHash.Exclusions = [ordered]@{}
+            $syncHash.Omissions = [ordered]@{}
+            $syncHash.Annotations = [ordered]@{}
+            $syncHash.GeneralSettings = [ordered]@{}
 
             # Dynamically reset all controls using configuration
             $syncHash.GetEnumerator() | ForEach-Object {
@@ -4128,12 +4306,12 @@ Function Invoke-SCuBAConfigAppUI {
                     try {
                         $toggleControl = $syncHash.$toggleName
                         $sectionConfig = $syncHash.UIConfigs.advancedSections.$toggleName
-                        
+
                         # Only process if toggle is checked
                         if ($toggleControl -and $toggleControl.IsChecked) {
                             foreach ($fieldControlName in $sectionConfig.fields) {
                                 $control = $syncHash.$fieldControlName
-                                
+
                                 if ($control -is [System.Windows.Controls.TextBox]) {
                                     $currentValue = $control.Text
                                     if (![string]::IsNullOrWhiteSpace($currentValue)) {
@@ -4164,18 +4342,15 @@ Function Invoke-SCuBAConfigAppUI {
         #===========================================================================
         # Make UI functional
         #===========================================================================
-        Function Initialize-DynamicTabs {
+
+        #Function Initialize-DynamicTabs {
             <#
-            .SYNOPSIS
-            Initializes dynamic tab content for product-specific policy configurations.
-            .DESCRIPTION
-            This function sets up dynamic tabs for different baseline controls, creating appropriate containers and UI elements for policy management.
-            #>
             .SYNOPSIS
             Initializes dynamic tab content for product-specific policy configurations.
             .DESCRIPTION
             This function creates and configures dynamic tabs for annotations, omissions, and exclusions based on the product configurations.
             #>
+            <#
             foreach ($baselineControl in $syncHash.UIConfigs.baselineControls) {
                 # Skip if this is the special exclusions case (handled differently due to product support)
                 if ($baselineControl.dataControlOutput -eq "Exclusions") {
@@ -4184,7 +4359,7 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Create tab
                 $tab = New-Object System.Windows.Controls.TabItem
-                $tab.Name = $baselineControl.dataControlOutput + "Tab"
+                $tab.Name = $baselineControl.tabName + "Tab"
                 $tab.Header = $baselineControl.tabName
                 $tab.IsEnabled = $false
 
@@ -4200,14 +4375,14 @@ Function Invoke-SCuBAConfigAppUI {
                 [System.Windows.Controls.Grid]::SetRow($headerBorder, 0)
 
                 $headerText = New-Object System.Windows.Controls.TextBlock
-                $headerText.Name = $baselineControl.dataControlOutput + "TabInfo_TextBlock"
+                $headerText.Name = $baselineControl.tabName + "TabInfo_TextBlock"
                 $headerText.TextWrapping = "Wrap"
                 $headerBorder.Child = $headerText
                 [void]$tabContent.Children.Add($headerBorder)
 
                 # Product tab control
                 $productTabControl = New-Object System.Windows.Controls.TabControl
-                $productTabControl.Name = $baselineControl.dataControlOutput + "ProductTabControl"
+                $productTabControl.Name = $baselineControl.tabName + "ProductTabControl"
                 [System.Windows.Controls.Grid]::SetRow($productTabControl, 1)
                 [void]$tabContent.Children.Add($productTabControl)
 
@@ -4218,6 +4393,8 @@ Function Invoke-SCuBAConfigAppUI {
                 $syncHash.($tab.Name) = $tab
             }
         }
+        Initialize-DynamicTabs
+        #>
 
         #update version
         $syncHash.Version_TextBlock.Text = "v$($syncHash.UIConfigs.Version)"
@@ -4299,7 +4476,7 @@ Function Invoke-SCuBAConfigAppUI {
 
             $checkBox = New-Object System.Windows.Controls.CheckBox
             $checkBox.Content = $product.displayName
-            $checkBox.Name = $product.id + "ProductCheckBox"
+            $checkBox.Name = ($product.id + "ProductCheckBox")
             $checkBox.Tag = $product.id
             $checkBox.Margin = "0,5"
 
@@ -4342,11 +4519,6 @@ Function Invoke-SCuBAConfigAppUI {
                 Write-DebugOutput -Message "Omit Policy sub tab enabled: $($productId)" -Source "UI Update" -Level "Info"
 
                 $container = $syncHash.("$($productId)OmissionContent")
-                <#
-                if ($container -and $container.Children.Count -eq 0) {
-                    New-ProductOmissions -ProductName $productId -Container $container
-                }
-                #>
                 New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Omissions"
 
 
@@ -4356,11 +4528,6 @@ Function Invoke-SCuBAConfigAppUI {
                 Write-DebugOutput -Message "Annotation sub tab enabled: $($productId)" -Source "UI Update" -Level "Info"
 
                 $container = $syncHash.("$($productId)AnnotationContent")
-                <#
-                if ($container -and $container.Children.Count -eq 0) {
-                    New-ProductAnnotations -ProductName $productId -Container $container
-                }
-                #>
                 New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Annotations"
 
                 #exclusions tab
@@ -4371,11 +4538,6 @@ Function Invoke-SCuBAConfigAppUI {
                     Write-DebugOutput -Message "Exclusion sub tab enabled: $($productId)" -Source "UI Update" -Level "Info"
 
                     $container = $syncHash.("$($productId)ExclusionContent")
-                    <#
-                    if ($container -and $container.Children.Count -eq 0) {
-                        New-ProductExclusions -ProductName $productId -Container $container
-                    }
-                    #>
                     New-ProductPolicyCards -ProductName $productId -Container $container -ControlType "Exclusions"
                 }
 
@@ -4411,17 +4573,17 @@ Function Invoke-SCuBAConfigAppUI {
                 }
 
                 # Clear data for this product
-                if ($syncHash.Exclusions.ContainsKey($productId)) {
+                if ($syncHash.Exclusions.Contains($productId)) {
                     $syncHash.Exclusions.Remove($productId)
                     Write-DebugOutput -Message "Cleared exclusions data for: $productId" -Source "User Action" -Level "Info"
                 }
 
-                if ($syncHash.Omissions.ContainsKey($productId)) {
+                if ($syncHash.Omissions.Contains($productId)) {
                     $syncHash.Omissions.Remove($productId)
                     Write-DebugOutput -Message "Cleared omissions data for: $productId" -Source "User Action" -Level "Info"
                 }
 
-                if ($syncHash.Annotations.ContainsKey($productId)) {
+                if ($syncHash.Annotations.Contains($productId)) {
                     $syncHash.Annotations.Remove($productId)
                     Write-DebugOutput -Message "Cleared annotations data for: $productId" -Source "User Action" -Level "Info"
                 }
@@ -4491,6 +4653,7 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
+
         # added events to all tab toggles
         $toggleControls = $syncHash.GetEnumerator() | Where-Object { $_.Name -like '*_Toggle' }
         foreach ($toggleName in $toggleControls) {
@@ -4534,6 +4697,44 @@ Function Invoke-SCuBAConfigAppUI {
             }
         }
 
+        # Add event to placeholder TextBoxes
+        foreach ($placeholderKey in $syncHash.UIConfigs.localePlaceholder.PSObject.Properties.Name) {
+            $control = $syncHash.$placeholderKey
+            if ($control -is [System.Windows.Controls.TextBox]) {
+                $placeholderText = $syncHash.UIConfigs.localePlaceholder.$placeholderKey
+                Initialize-PlaceholderTextBox -TextBox $control -PlaceholderText $placeholderText
+            }
+        }
+
+        # If YAMLImport is specified, load the YAML configuration
+        # Process YAMLConfigFile parameter AFTER UI is fully initialized
+        If($syncHash.YAMLImport){
+            try {
+                Write-DebugOutput -Message "Processing YAMLConfigFile parameter: $($syncHash.YAMLImport)" -Source "UI Launch" -Level "Info"
+
+                # Import with progress window
+                $importSuccess = Invoke-YamlImportWithProgress -YamlFilePath $syncHash.YAMLImport -WindowTitle "Loading Configuration File"
+
+                if ($importSuccess) {
+                    Write-DebugOutput -Message "YAMLConfigFile processed successfully" -Source "UI Launch" -Level "Info"
+                } else {
+                    Write-DebugOutput -Message "YAMLConfigFile processing failed" -Source "UI Launch" -Level "Warning"
+                }
+            }
+            catch {
+                Write-DebugOutput -Message "Error processing YAMLConfigFile: $($_.Exception.Message)" -Source "UI Launch" -Level "Error"
+                [System.Windows.MessageBox]::Show("Error importing configuration file: $($_.Exception.Message)", "Import Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
+            }
+        }
+
+        $syncHash.Window.Dispatcher.Invoke([Action]{
+            try {
+                $syncHash.Debug_TextBox.AppendText("UI START`r`n")
+                $syncHash.Debug_TextBox.ScrollToEnd()
+            } catch {
+                Write-Error "Dispatcher error: $($_.Exception.Message)"
+            }
+        })
         #===========================================================================
         # Button Event Handlers
         #===========================================================================
@@ -4562,24 +4763,12 @@ Function Invoke-SCuBAConfigAppUI {
 
             if ($openFileDialog.ShowDialog() -eq $true) {
                 try {
-                    # Load and parse the YAML file
-                    $yamlContent = Get-Content -Path $openFileDialog.FileName -Raw
-                    $yamlHash = $yamlContent | ConvertFrom-Yaml
+                    # Import with progress window
+                    $importSuccess = Invoke-YamlImportWithProgress -YamlFilePath $openFileDialog.FileName -WindowTitle "Importing Configuration"
 
-                    # Clear existing data
-                    $syncHash.Exclusions = @{}
-                    $syncHash.Omissions = @{}
-                    $syncHash.Annotations = @{}
-                    $syncHash.GeneralSettings = @{}
-                    $syncHash.AdvancedSettings = @{}
-
-                    # Import data into the core data structures
-                    Import-YamlToDataStructures -Config $yamlHash
-
-                    # Trigger UI update through reactive system
-                    Set-DataChanged
-
-                    [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.ImportSuccess, "Import Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                    if ($importSuccess) {
+                        [System.Windows.MessageBox]::Show($syncHash.UIConfigs.localePopupMessages.ImportSuccess, "Import Complete", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information)
+                    }
                 }
                 catch {
                     [System.Windows.MessageBox]::Show("Error importing configuration: $($_.Exception.Message)", "Import Error", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error)
@@ -4596,9 +4785,7 @@ Function Invoke-SCuBAConfigAppUI {
                 # Organization validation (required)
                 $orgValid = Confirm-RequiredField -UIElement $syncHash.Organization_TextBox `
                                         -RegexPattern $syncHash.UIConfigs.valueValidations.tenantDomain.pattern `
-                                        -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.OrganizationValidation `
-                                        -PlaceholderText $syncHash.UIConfigs.localePlaceholder.Organization_TextBox `
-                                        -ShowMessageBox:$false
+                                        -PlaceholderText $syncHash.UIConfigs.localePlaceholder.Organization_TextBox
 
                 if (-not $orgValid) {
                     $errorMessages += $syncHash.UIConfigs.localeErrorMessages.OrganizationValidation
@@ -4614,9 +4801,7 @@ Function Invoke-SCuBAConfigAppUI {
                     # AppID validation (GUID format)
                     $appIdValid = Confirm-RequiredField -UIElement $syncHash.AppId_TextBox `
                                                     -RegexPattern $syncHash.UIConfigs.valueValidations.guid.pattern `
-                                                    -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.AppIdValidation `
                                                     -PlaceholderText $syncHash.UIConfigs.localePlaceholder.AppId_TextBox `
-                                                    -ShowMessageBox:$false
 
                     if (-not $appIdValid) {
                         $errorMessages += $syncHash.UIConfigs.localeErrorMessages.AppIdValidation
@@ -4626,9 +4811,7 @@ Function Invoke-SCuBAConfigAppUI {
                     # Certificate Thumbprint validation (40 character hex)
                     $certValid = Confirm-RequiredField -UIElement $syncHash.CertificateThumbprint_TextBox `
                                                     -RegexPattern $syncHash.UIConfigs.valueValidations.thumbprint.pattern `
-                                                    -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.CertificateValidation `
-                                                    -PlaceholderText $syncHash.UIConfigs.localePlaceholder.CertificateThumbprint_TextBox `
-                                                    -ShowMessageBox:$false
+                                                    -PlaceholderText $syncHash.UIConfigs.localePlaceholder.CertificateThumbprint_TextBox
 
                     if (-not $certValid) {
                         $errorMessages += $syncHash.UIConfigs.localeErrorMessages.CertificateValidation
@@ -4639,55 +4822,31 @@ Function Invoke-SCuBAConfigAppUI {
                 # OPA Section Validations
                 if ($syncHash.OpaSection_Toggle.IsChecked) {
 
-                    # OPA Path validation using Confirm-RequiredField
+                    # OPA Path validation using enhanced Confirm-RequiredField
                     $opaPathValid = Confirm-RequiredField -UIElement $syncHash.OpaPath_TextBox `
-                                                    -ErrorMessage $syncHash.UIConfigs.localeErrorMessages.OpaPathRequired `
                                                     -PlaceholderText $syncHash.UIConfigs.localePlaceholder.OpaPath_TextBox `
-                                                    -ShowMessageBox:$false
+                                                    -TestPath `
+                                                    -RequiredFiles @("opa_windows_amd64.exe", "opa.exe") `
 
                     if (-not $opaPathValid) {
-                        $errorMessages += $syncHash.UIConfigs.localeErrorMessages.OpaPathRequired
+                        $errorMessages += ($syncHash.UIConfigs.localeErrorMessages.OpaPathValidation -f $syncHash.OpaPath_TextBox.Text)
                         $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
-                    } else {
-                        # Additional validation for executable existence (only if basic validation passed)
-                        $opaPath = $syncHash.OpaPath_TextBox.Text.Trim()
-                        $opaValid = $false
-                        $opaErrorMessage = ""
-
-                        # Check if path exists
-                        if (Test-Path $opaPath) {
-                            # Check for opa_windows_amd64.exe or opa.exe in the specified path
-                            $opaExe1 = Join-Path $opaPath "opa_windows_amd64.exe"
-                            $opaExe2 = Join-Path $opaPath "opa.exe"
-
-                            if (Test-Path $opaExe1) {
-                                $opaValid = $true
-                            } elseif (Test-Path $opaExe2) {
-                                $opaValid = $true
-                            } else {
-                                $opaErrorMessage = ($syncHash.UIConfigs.localeErrorMessages.OpaPathValidation -f $opaPath)
-                            }
-                        } else {
-                            $opaErrorMessage = ($syncHash.UIConfigs.localeErrorMessages.OpaFileNotExist -f $opaPath)
-                        }
-
-                        if (-not $opaValid) {
-                            $errorMessages += $opaErrorMessage
-                            $syncHash.MainTabControl.SelectedItem = $syncHash.AdvancedTab
-                        }
                     }
+
                 }
 
                 # Show consolidated error message if there are validation errors
                 if ($errorMessages.Count -gt 0) {
                     $syncHash.PreviewTab.IsEnabled = $false
-                    $consolidatedMessage = $syncHash.UIConfigs.localeErrorMessages.PreviewValidation + "`n`n" + ($errorMessages -join "`n")
-                    [System.Windows.MessageBox]::Show($consolidatedMessage, "Validation Errors", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
+                    #$errorMessages += $syncHash.UIConfigs.localeErrorMessages.PreviewValidation + "`n`n" + ($errorMessages -join "`n")
+                    [System.Windows.MessageBox]::Show($errorMessages, "Validation Errors", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Warning)
                 }else {
                     $syncHash.PreviewTab.IsEnabled = $true
                 }
 
                 if ($errorMessages.Count -eq 0) {
+                    Save-GeneralSettingsFromInput
+                    Save-AdvancedSettingsFromInput
                     New-YamlPreview
                 }
             }) #end Dispatcher.Invoke
@@ -4794,8 +4953,13 @@ Function Invoke-SCuBAConfigAppUI {
             $folderDialog.Description = "Select OPA Path"
             $folderDialog.ShowNewFolderButton = $true
 
+            # Check if current textbox has a valid path, otherwise use ScubaGear default
             if ($syncHash.OpaPath_TextBox.Text -ne "." -and (Test-Path $syncHash.OpaPath_TextBox.Text)) {
                 $folderDialog.SelectedPath = $syncHash.OpaPath_TextBox.Text
+            } else {
+                # Default to ScubaGear Tools directory
+                $defaultOpaPath = Join-Path $env:UserProfile ".scubagear\Tools"
+                $folderDialog.SelectedPath = $defaultOpaPath
             }
 
             $result = $folderDialog.ShowDialog()
@@ -4864,6 +5028,8 @@ Function Invoke-SCuBAConfigAppUI {
                                     -ReturnProperty "Thumbprint"
 
                 $syncHash.CertificateThumbprint_TextBox.Text = $selectedThumbprint
+                $syncHash.CertificateThumbprint_TextBox.Foreground = [System.Windows.Media.Brushes]::Black
+                $syncHash.CertificateThumbprint_TextBox.FontStyle = [System.Windows.FontStyles]::Normal
                 Write-DebugOutput -Message ($syncHash.UIConfigs.localeInfoMessages.SelectedCertificateThumbprint -f $selectedThumbprint) -Source "Certificate Selection" -Level "Info"
             }
             catch {
@@ -4915,10 +5081,12 @@ Function Invoke-SCuBAConfigAppUI {
 
                 # Run cleanup but DON'T call window.Close() again
                 try {
+                    <#
                     # Run memory cleanup
                     if ($syncHash.InvokeMemoryCleanup) {
                         $syncHash.InvokeMemoryCleanup.Invoke($true)
                     }
+                    #>
 
                     # Run cleanup but skip the window closing part
                     Close-UIMainWindow
@@ -4934,6 +5102,7 @@ Function Invoke-SCuBAConfigAppUI {
 
             # Final cleanup
             try {
+                <#
                 if ($syncHash.UIUpdateTimer) {
                     $syncHash.UIUpdateTimer.Stop()
                     $syncHash.UIUpdateTimer = $null
@@ -4943,6 +5112,7 @@ Function Invoke-SCuBAConfigAppUI {
                     $syncHash.DebugFlushTimer.Dispose()
                     $syncHash.DebugFlushTimer = $null
                 }
+                #>
 
                 $syncHash.isClosed = $true
 
@@ -4959,23 +5129,7 @@ Function Invoke-SCuBAConfigAppUI {
         #always force windows on bottom
         $syncHash.Window.Topmost = $True
 
-
-
-        $syncHash.UIUpdateTimer.Start()
-
-        #Allow UI to be dragged around screen
-        <#
-        $syncHash.Window.Add_MouseLeftButtonDown( {
-            $syncHash.Window.DragMove()
-        })
-        #>
-
-        #action for exit button
-        <#
-        $syncHash.btnExit.Add_Click({
-            Close-UIMainWindow
-        })
-        #>
+        #$syncHash.UIUpdateTimer.Start()
 
         $syncHash.Window.ShowDialog()
         #$Runspace.Close()
@@ -4999,9 +5153,20 @@ Function Invoke-SCuBAConfigAppUI {
 
     If($Passthru){
         return $Data
+
     }
 
 }
+
+
+<#
+# To show configurations run:"
+$syncHash.GeneralSettings | ConvertTo-Json
+$syncHash.AdvancedSettings | ConvertTo-Json
+$syncHash.Exclusions | ConvertTo-Json -Depth 5
+$syncHash.Omissions | ConvertTo-Json -Depth 5
+$syncHash.Annotations | ConvertTo-Json -Depth 5
+#>
 
 
 Export-ModuleMember -Function @(

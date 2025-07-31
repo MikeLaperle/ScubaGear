@@ -36,7 +36,7 @@ If that fails, you can manually download the OPA executable.
 
 > **Note**: To find older supported versions, go to the [Support](https://github.com/cisagov/ScubaGear/blob/main/PowerShell/ScubaGear/Modules/Support/Support.psm1) file, and find the constant named `$ACCEPTABLEVERSIONS`.
 
-* Using the navigation menu on the left side, click `Introduction`, then `Running OPA`, and then `Download OPA`.
+* Using the navigation menu on the left side, click `Introduction`, then, on the right hand side of the page, click `Running OPA`, and then `Download OPA`.
 
 * On the main portion of the screen, find the paragraph in the blue box that begins with "Windows users can obtain the OPA executable from here" and click the link in "here" to download the executable.
 
